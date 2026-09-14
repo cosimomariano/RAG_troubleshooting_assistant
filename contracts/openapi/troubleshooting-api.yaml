@@ -1,0 +1,132 @@
+openapi: 3.1.0
+
+info:
+  title: Contratto API dell'assistente RAG per il troubleshooting
+  version: 0.1.0
+  description: Contratto API per un assistente RAG dedicato al troubleshooting di applicazioni backend a microservizi. Il servizio restituisce una risposta motivata e le fonti tecniche utilizzate nella risoluzione del quesito posto.
+
+paths:
+  /troubleshoot:
+    post:
+      summary: Operation che permette di generare una risposta a partire da una analisi della richiesta con eventuale errore da debuggare , avvalorando la risposta fornita fornendo i puntamenti alle fonti testuali fornite in input al sistema.
+      description: Operation che permette di generare una risposta a partire da una analisi della richiesta con eventuale errore da debuggare , avvalorando la risposta fornita fornendo i puntamenti alle fonti testuali fornite in input al sistema.
+      operationId: troubleshootIncident
+      requestBody:
+        required: true
+        description: Dati necessari per formulare la richiesta di troubleshooting
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TroubleshootingRequest'
+      responses:
+        '200':
+          description: Oggetto di risposta per un'analisi completata con successo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TroubleshootingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+components:
+  schemas:
+    TroubleshootingRequest:
+      type: object
+      description: Informazioni fornite per analizzare un incidente tecnico
+      additionalProperties: false
+      required:
+        - question
+      properties:
+        question:
+          type: string
+          minLength: 1
+          description: Domanda tecnica alla quale l'assistente deve rispondere
+          examples:
+            - "La chiamata x fornisce in risposta Error 500, come mai?"
+        incident_context:
+          type:
+            - string
+            - 'null'
+          description: Evidenze disponibili sull'incidente, come estratti normalizzati di log, tracce, metriche o messaggi di errore
+          default: null
+          examples:
+            - Il servizio checkout riceve connection refused dal servizio payment
+        service:
+          type:
+            - string
+            - 'null'
+          description: Nome del servizio principalmente interessato dall'incidente
+          default: null
+          examples:
+            - checkout
+
+    TroubleshootingResponse:
+      type: object
+      description: Risultato dell'analisi di troubleshooting
+      additionalProperties: false
+      required:
+        - answer
+        - sources
+        - latency_ms
+      properties:
+        answer:
+          type: string
+          description: Risposta formulata sulla base delle evidenze disponibili
+        sources:
+          type: array
+          description: Identificativi delle fonti tecniche usate per la risposta
+          items:
+            type: string
+            description: Identificativo di una fonte tecnica consultata
+        latency_ms:
+          type: number
+          format: double
+          minimum: 0
+          description: Tempo totale di elaborazione della richiesta espressso in millisecondi
+
+    ErrorResponse:
+      type: object
+      description: Errore restituito quando la richiesta non può essere completata
+      additionalProperties: false
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Codice stabile e leggibile automaticamente che identifica l'errore
+        message:
+          type: string
+          description: Spiegazione dell'errore in forma leggibile
+
+  responses:
+    BadRequest:
+      description: Errore nella sottomissione della richiesta nel caso in cui quest'ultima non è valida o non può essere elaborata
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ValidationError:
+      description: Errore di validazione per i casi in cui il corpo della richiesta non rispetta il contratto previsto
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalServerError:
+      description: Errore lato server durante l'elaborazione della richiesta
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServiceUnavailable:
+      description: Errore associato a server non raggiungibile
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
