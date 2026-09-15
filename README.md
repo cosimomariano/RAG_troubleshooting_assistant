@@ -73,6 +73,15 @@ Il sistema esporrà un endpoint REST principale:
 
 # TODO COSIMO
 
+## Note sulla logica di commit e git flow
+
+Ogni commit è composto in questo modo:
+
+    [RAG]: breve messaggio dell'evolutiva
+
+per ordine e tracciamento delle evolutive nel corso del tempo.
+Ogni evolutiva è tracciata da un branch che sucessivamente al testing sarà mergiato nel ramo di develop e successivamente rilasciato nel ramo di release, seguendo la logica di git flow.
+
 ## Autore
 
  - Cosimo Mariano
