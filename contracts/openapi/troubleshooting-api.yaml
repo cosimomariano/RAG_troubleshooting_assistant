@@ -1,30 +1,74 @@
 openapi: 3.1.0
-
 info:
   title: Contratto API dell'assistente RAG per il troubleshooting
-  version: 0.1.0
-  description: Contratto API per un assistente RAG dedicato al troubleshooting di applicazioni backend a microservizi. Il servizio restituisce una risposta motivata e le fonti tecniche utilizzate nella risoluzione del quesito posto.
-
+  version: 0.2.0
+  description: >
+    Contratto API per un assistente Retrieval-Augmented Generation (RAG) dedicato al troubleshooting di applicazioni backend a microservizi.
+    Il sistema riceve una domanda tecnica, un eventuale contesto dell'incidente ed eventuali evidenze di telemetria normalizzate. Recupera quindi informazioni pertinenti dalla Knowledge Base e genera una risposta corredata dalle fonti tecniche utilizzate.
+    
 paths:
   /troubleshoot:
     post:
-      summary: Operation che permette di generare una risposta a partire da una analisi della richiesta con eventuale errore da debuggare , avvalorando la risposta fornita fornendo i puntamenti alle fonti testuali fornite in input al sistema.
-      description: Operation che permette di generare una risposta a partire da una analisi della richiesta con eventuale errore da debuggare , avvalorando la risposta fornita fornendo i puntamenti alle fonti testuali fornite in input al sistema.
+      summary: Analizza un incidente tecnico tramite il sistema RAG
+      description: >
+        Riceve una domanda relativa a un problema tecnico, interroga la Knowledge Base attraverso la pipeline di retrieval configurata e genera una risposta basandosi sulle fonti documentali recuperate.
       operationId: troubleshootIncident
       requestBody:
         required: true
-        description: Dati necessari per formulare la richiesta di troubleshooting
+        description: |
+          Informazioni necessarie per effettuare l'analisi di troubleshooting.
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/TroubleshootingRequest'
+            examples:
+              simpleQuestion:
+                summary: Domanda senza telemetria strutturata
+                value:
+                  question: >
+                    Il servizio checkout riceve connection refused durante il pagamento, quale potrebbe essere il problema?
+                  incident_context: >
+                    Durante il checkout la chiamata verso il servizio payment fallisce.
+                  service: checkout
+              telemetryQuestion:
+                summary: Domanda con evidenze di telemetria
+                value:
+                  question: |
+                    Perché il checkout non riesce a completare il pagamento?
+                  incident_context: |
+                    Il problema si verifica durante la fase di charge.
+                  service: checkout
+                  telemetry:
+                    trace_id: trace-example-001
+                    logs:
+                      - service: checkout
+                        severity: ERROR
+                        message: connection refused while contacting payment
+                    spans:
+                      - service: checkout
+                        operation: payment/charge
+                        status: ERROR
+                        peer_service: payment
+                    metrics: []
       responses:
         '200':
-          description: Oggetto di risposta per un'analisi completata con successo
+          description: Analisi completata con successo
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TroubleshootingResponse'
+              examples:
+                successfulResponse:
+                  value:
+                    answer: >
+                      Le evidenze indicano che il servizio checkout non riesce a raggiungere il servizio payment.
+                       Verificare la disponibilità del servizio e la configurazione dell'endpoint utilizzato.
+                    sources:
+                      - source: payment-unreachable.md
+                        chunk_id: payment-unreachable-0001
+                        section: Possible causes
+                        service: payment
+                    latency_ms: 842
         '400':
           $ref: '#/components/responses/BadRequest'
         '422':
@@ -33,12 +77,12 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-
 components:
   schemas:
     TroubleshootingRequest:
       type: object
-      description: Informazioni fornite per analizzare un incidente tecnico
+      description: |
+        Informazioni fornite dall'utente per analizzare un incidente tecnico.
       additionalProperties: false
       required:
         - question
@@ -46,29 +90,210 @@ components:
         question:
           type: string
           minLength: 1
-          description: Domanda tecnica alla quale l'assistente deve rispondere
+          description: |
+            Domanda tecnica alla quale l'assistente deve rispondere.
           examples:
-            - "La chiamata x fornisce in risposta Error 500, come mai?"
+            - >-
+              La chiamata al servizio payment restituisce HTTP 500. Quale può essere la causa?
         incident_context:
           type:
             - string
             - 'null'
-          description: Evidenze disponibili sull'incidente, come estratti normalizzati di log, tracce, metriche o messaggi di errore
           default: null
+          description: >
+            Descrizione testuale opzionale del contesto dell'incidente.
           examples:
-            - Il servizio checkout riceve connection refused dal servizio payment
+            - >-
+              Il servizio checkout riceve connection refused dal servizio payment.
         service:
           type:
             - string
             - 'null'
-          description: Nome del servizio principalmente interessato dall'incidente
           default: null
+          description: >
+            Nome del microservizio principalmente interessato dall'incidente, se noto.
           examples:
             - checkout
-
+        telemetry:
+          anyOf:
+            - $ref: '#/components/schemas/TelemetryContext'
+            - type: 'null'
+          default: null
+          description: >
+            Evidenze di telemetria normalizzate relative all'incidente.
+    TelemetryContext:
+      type: object
+      additionalProperties: false
+      description: |
+        Contesto di telemetria normalizzato associato all'incidente analizzato.
+      properties:
+        trace_id:
+          type:
+            - string
+            - 'null'
+          default: null
+          description: >
+            Identificativo della distributed trace associata all'incidente, se disponibile.
+        logs:
+          type: array
+          default: []
+          description: |
+            Evidenze provenienti dai log applicativi.
+          items:
+            $ref: '#/components/schemas/LogEvidence'
+        spans:
+          type: array
+          default: []
+          description: |
+            Span rilevanti estratti dalla distributed trace.
+          items:
+            $ref: '#/components/schemas/SpanEvidence'
+        metrics:
+          type: array
+          default: []
+          description: |
+            Metriche considerate rilevanti per l'incidente.
+          items:
+            $ref: '#/components/schemas/MetricEvidence'
+    LogEvidence:
+      type: object
+      additionalProperties: false
+      required:
+        - service
+        - message
+      description: |
+        Evidenza normalizzata proveniente da un log applicativo.
+      properties:
+        timestamp:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          default: null
+          description: 'Timestamp del log, se disponibile.'
+        service:
+          type: string
+          minLength: 1
+          description: |
+            Microservizio che ha prodotto il log.
+        severity:
+          type:
+            - string
+            - 'null'
+          default: null
+          description: |
+            Livello di severità del log.
+          examples:
+            - ERROR
+        message:
+          type: string
+          minLength: 1
+          description: |
+            Messaggio di log normalizzato.
+          examples:
+            - connection refused while contacting payment
+        error_type:
+          type:
+            - string
+            - 'null'
+          default: null
+          description: |
+            Tipo di errore o eccezione, se disponibile.
+          examples:
+            - ConnectionRefusedError
+    SpanEvidence:
+      type: object
+      additionalProperties: false
+      required:
+        - service
+        - operation
+        - status
+      description: |
+        Evidenza proveniente da uno span di una distributed trace.
+      properties:
+        span_id:
+          type:
+            - string
+            - 'null'
+          default: null
+          description: |
+            Identificativo dello span, se disponibile.
+        service:
+          type: string
+          minLength: 1
+          description: |
+            Microservizio associato allo span.
+        operation:
+          type: string
+          minLength: 1
+          description: |
+            Operazione rappresentata dallo span.
+          examples:
+            - payment/charge
+        status:
+          type: string
+          enum:
+            - OK
+            - ERROR
+            - UNSET
+          description: |
+            Stato normalizzato dello span.
+        peer_service:
+          type:
+            - string
+            - 'null'
+          default: null
+          description: |
+            Eventuale servizio remoto coinvolto nell'operazione.
+          examples:
+            - payment
+        error_message:
+          type:
+            - string
+            - 'null'
+          default: null
+          description: |
+            Messaggio di errore associato allo span, se disponibile.
+    MetricEvidence:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - value
+      description: |
+        Evidenza normalizzata derivata da una metrica.
+      properties:
+        service:
+          type:
+            - string
+            - 'null'
+          default: null
+          description: |
+            Microservizio al quale la metrica è associata.
+        name:
+          type: string
+          minLength: 1
+          description: |
+            Nome della metrica.
+          examples:
+            - request.duration
+        value:
+          type: number
+          description: |
+            Valore osservato della metrica.
+        unit:
+          type:
+            - string
+            - 'null'
+          default: null
+          description: |
+            Unità di misura della metrica.
+          examples:
+            - ms
     TroubleshootingResponse:
       type: object
-      description: Risultato dell'analisi di troubleshooting
+      description: |
+        Risultato dell'analisi di troubleshooting.
       additionalProperties: false
       required:
         - answer
@@ -77,22 +302,72 @@ components:
       properties:
         answer:
           type: string
-          description: Risposta formulata sulla base delle evidenze disponibili
+          minLength: 1
+          description: >
+            Risposta generata dal sistema sulla base della domanda, delle
+            evidenze disponibili e dei documenti recuperati.
         sources:
           type: array
-          description: Identificativi delle fonti tecniche usate per la risposta
+          description: >
+            Fonti documentali utilizzate per costruire la risposta.
+
+            L'array può essere vuoto, ad esempio nel caso del baseline
+            sperimentale LLM senza RAG.
           items:
-            type: string
-            description: Identificativo di una fonte tecnica consultata
+            $ref: '#/components/schemas/SourceReference'
         latency_ms:
           type: number
           format: double
           minimum: 0
-          description: Tempo totale di elaborazione della richiesta espressso in millisecondi
-
+          description: >
+            Tempo totale di elaborazione della richiesta espresso in
+            millisecondi.
+    SourceReference:
+      type: object
+      additionalProperties: false
+      required:
+        - source
+        - chunk_id
+      description: >
+        Riferimento alla porzione della Knowledge Base utilizzata durante la
+        generazione della risposta.
+      properties:
+        source:
+          type: string
+          minLength: 1
+          description: |
+            Documento originale dal quale proviene il contenuto recuperato.
+          examples:
+            - payment-unreachable.md
+        chunk_id:
+          type: string
+          minLength: 1
+          description: |
+            Identificativo stabile del chunk recuperato.
+          examples:
+            - payment-unreachable-0001
+        section:
+          type:
+            - string
+            - 'null'
+          default: null
+          description: |
+            Sezione del documento dalla quale proviene il chunk.
+          examples:
+            - Possible causes
+        service:
+          type:
+            - string
+            - 'null'
+          default: null
+          description: |
+            Microservizio associato alla fonte, se disponibile.
+          examples:
+            - payment
     ErrorResponse:
       type: object
-      description: Errore restituito quando la richiesta non può essere completata
+      description: |
+        Errore restituito quando la richiesta non può essere completata.
       additionalProperties: false
       required:
         - code
@@ -100,33 +375,62 @@ components:
       properties:
         code:
           type: string
-          description: Codice stabile e leggibile automaticamente che identifica l'errore
+          minLength: 1
+          description: >
+            Codice applicativo stabile e leggibile automaticamente che
+            identifica l'errore.
+          examples:
+            - LLM_SERVICE_UNAVAILABLE
         message:
           type: string
-          description: Spiegazione dell'errore in forma leggibile
-
+          minLength: 1
+          description: |
+            Descrizione dell'errore in forma leggibile.
+          examples:
+            - Il servizio LLM remoto non è raggiungibile.
   responses:
     BadRequest:
-      description: Errore nella sottomissione della richiesta nel caso in cui quest'ultima non è valida o non può essere elaborata
+      description: |
+        La richiesta è semanticamente non valida o non può essere elaborata.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: INVALID_REQUEST
+            message: La richiesta non può essere elaborata.
     ValidationError:
-      description: Errore di validazione per i casi in cui il corpo della richiesta non rispetta il contratto previsto
+      description: |
+        Il corpo della richiesta non rispetta il contratto API previsto.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: VALIDATION_ERROR
+            message: Il campo question è obbligatorio.
     InternalServerError:
-      description: Errore lato server durante l'elaborazione della richiesta
+      description: >
+        Si è verificato un errore interno durante l'elaborazione della
+        richiesta.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: INTERNAL_ERROR
+            message: Errore interno durante l'elaborazione della richiesta.
     ServiceUnavailable:
-      description: Errore associato a server non raggiungibile
+      description: >
+        Una dipendenza necessaria al completamento della richiesta non è
+        disponibile.
+
+        Può verificarsi, ad esempio, quando il servizio LLM remoto non è
+        raggiungibile.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: LLM_SERVICE_UNAVAILABLE
+            message: Il servizio LLM remoto non è raggiungibile.
