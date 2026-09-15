@@ -1,0 +1,25 @@
+application:
+  name: rag-troubleshooting-assistant
+  environment: ${APP_ENV}
+
+server:
+  host: ${SERVER_HOST}
+  port: ${SERVER_PORT}
+
+logging:
+  level: ${LOG_LEVEL}
+  format: json
+
+llm:
+  provider: ollama
+  base_url: ${OLLAMA_BASE_URL}
+  model: ${OLLAMA_MODEL}
+  timeout_seconds: 120
+
+#ingestion: 
+#telemetry:
+#chunking:
+#embeddings:
+#retrieval:
+#generation:
+#incident_analyzer:
