@@ -16,7 +16,13 @@ llm:
   model: ${OLLAMA_MODEL}
   timeout_seconds: 120
 
-#ingestion: 
+ingestion:
+  knowledge_base_path: ${KNOWLEDGE_BASE_PATH}
+  supported_extensions:
+    - .md
+    - .txt
+  recursive: true
+
 #telemetry:
 #chunking:
 #embeddings:

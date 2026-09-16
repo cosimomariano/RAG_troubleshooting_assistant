@@ -17,13 +17,12 @@ def test_openapi_contract_is_valid() -> None:
 
     validate(specification, cls=OpenAPIV31SpecValidator)
 
-
 def test_base_application_configuration_loads() -> None:
     configuration = load_yaml("configs/application.yaml")
 
-    assert set(configuration) == {"application", "server", "logging", "llm"}
+    assert set(configuration) == {"application", "server", "logging", "llm", "ingestion"}
     assert configuration["application"]["name"] == "rag-troubleshooting-assistant"
-
+    assert configuration["ingestion"]["supported_extensions"] == [".md", ".txt"]
 
 def test_environment_placeholders_are_documented() -> None:
     configuration = (PROJECT_ROOT / "configs/application.yaml").read_text(encoding="utf-8")
