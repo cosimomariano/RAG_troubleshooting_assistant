@@ -24,7 +24,11 @@ ingestion:
   recursive: true
 
 #telemetry:
-#chunking:
+chunking:
+  strategy: section_aware
+  chunk_size_characters: 1200
+  chunk_overlap_characters: 200
+
 #embeddings:
 #retrieval:
 #generation:
