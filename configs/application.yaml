@@ -29,6 +29,14 @@ chunking:
   chunk_size_characters: 1200
   chunk_overlap_characters: 200
 
+masking:
+  enabled: true
+  categories:
+    - credentials
+    - email
+    - iban
+    - private_ipv4
+
 #embeddings:
 #retrieval:
 #generation:
