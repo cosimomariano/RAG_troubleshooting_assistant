@@ -4,7 +4,7 @@ import pytest
 
 from app.indexing import EmbeddingModel, SentenceTransformerEmbeddingModel
 
-
+ ## UTILIZZO UN SENTENCE TRANSFORMER MOCKATO PER NON SOVRACCARICARE LA CPU NELLA FASE DI TEST IN QUANTO NON NECESSARIO
 class FakeSentenceTransformer:
     def __init__(self, vectors: Sequence[Sequence[float]] | None = None) -> None:
         self.vectors = vectors

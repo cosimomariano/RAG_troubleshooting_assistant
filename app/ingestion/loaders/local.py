@@ -48,6 +48,7 @@ class LocalDocumentLoader:
             raise ValueError(f"Estensione non supportata: {extension or '<nessuna>'}")
 
         source = relative_path.as_posix()
+        #Genero identificativo del documento con sha per prevenire duplicati
         document_id = f"document-{sha256(source.encode('utf-8')).hexdigest()}"
 
         return Document(

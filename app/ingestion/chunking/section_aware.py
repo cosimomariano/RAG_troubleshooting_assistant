@@ -26,6 +26,8 @@ class SectionAwareChunker:
 
         return chunks
 
+    ## SPLIT DELLE SEZIONI
+
     def _split_sections(self, document: Document) -> list[tuple[str | None, str]]:
         if document.metadata.document_type != "markdown":
             return [(document.metadata.section, document.text)]
@@ -49,6 +51,8 @@ class SectionAwareChunker:
 
         return sections
 
+    ## SPLIT DEL TESTO CONTENUTO NELLE SEZIONI 
+
     def _split_text(self, text: str) -> list[str]:
         normalized_text = text.strip()
         if not normalized_text:
@@ -65,6 +69,7 @@ class SectionAwareChunker:
 
         return chunks
 
+    ## METODO DI COMODO PER LA COSTRUZIONE DI UN CHUNK ID DA UTILIZZARE
     @staticmethod
     def _build_chunk_id( document_id: str, section: str | None, position: int, text: str) -> str:
         payload = f"{document_id}\0{section or ''}\0{position}\0{text}"
