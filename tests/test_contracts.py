@@ -13,25 +13,42 @@ def load_yaml(relative_path: str) -> dict:
     assert isinstance(document, dict)
     return document
 
-def test_openapi_contract_is_valid() -> None:
+def test_troubleshooting_openapi_is_a_valid_version_31_contract() -> None:
     specification = load_yaml("contracts/openapi/troubleshooting-api.yaml")
 
     validate(specification, cls=OpenAPIV31SpecValidator)
 
-def test_base_application_configuration_loads() -> None:
+def test_configuration_exposes_only_components_available_at_this_stage() -> None:
     configuration = load_yaml("configs/application.yaml")
 
-    assert set(configuration) == { "application", "server", "logging", "llm", "ingestion", "chunking", "masking", "embeddings"}
+    assert set(configuration) == {
+        "application",
+        "server",
+        "logging",
+        "llm",
+        "ingestion",
+        "chunking",
+        "masking",
+        "embeddings",
+    }
     assert configuration["application"]["name"] == "rag-troubleshooting-assistant"
     assert configuration["ingestion"]["supported_extensions"] == [".md", ".txt"]
-    assert (configuration["chunking"]["chunk_overlap_characters"] < configuration["chunking"]["chunk_size_characters"])
+    assert (
+        configuration["chunking"]["chunk_overlap_characters"]
+        < configuration["chunking"]["chunk_size_characters"]
+    )
     assert configuration["masking"] == {
         "enabled": True,
         "categories": ["credentials", "email", "iban", "private_ipv4"],
     }
-    assert configuration["embeddings"] == { "provider": "sentence_transformers", "model": "${EMBEDDING_MODEL}", "batch_size": 32, "normalize": True,}
+    assert configuration["embeddings"] == {
+        "provider": "sentence_transformers",
+        "model": "${EMBEDDING_MODEL}",
+        "batch_size": 32,
+        "normalize": True,
+    }
 
-def test_environment_placeholders_are_documented() -> None:
+def test_every_configuration_placeholder_has_an_env_example_entry() -> None:
     configuration = (PROJECT_ROOT / "configs/application.yaml").read_text(encoding="utf-8")
     env_example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
 
