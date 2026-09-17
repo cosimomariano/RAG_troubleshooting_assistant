@@ -5,4 +5,4 @@ class SensitiveDataMasker(ABC):
 
     @abstractmethod
     def mask(self, text: str) -> str:
-        """Restituisce il testo dopo aver sostituito i valori sensibili rilevati."""
+        """Questo metodo astratto esegue le operazioni di mascheramento degli implementatori e torna la string mascherata"""

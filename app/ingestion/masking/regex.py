@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from ipaddress import IPv4Address, IPv4Network
 from app.ingestion.masking.base import SensitiveDataMasker
 
+ # Questa classe estende la classe base e viene richiamata da quest'ultima per le operazioni di mascheramento
+
 MaskingReplacement = str | Callable[[re.Match[str]], str]
 
 _CREDENTIAL_PLACEHOLDER = "[MASCHERATO:CREDENZIALE]"

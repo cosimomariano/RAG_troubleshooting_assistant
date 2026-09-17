@@ -2,29 +2,19 @@
 
 from hashlib import sha256
 from pathlib import Path
-
 from app.models import Document, SourceMetadata
 
 SUPPORTED_EXTENSIONS = (".md", ".txt")
-DOCUMENT_TYPE_BY_EXTENSION = {
-    ".md": "markdown",
-    ".txt": "text",
-}
-
+DOCUMENT_TYPE_BY_EXTENSION = {".md": "markdown", ".txt": "text"}
 
 class LocalDocumentLoader:
-    """Carica documenti UTF-8 contenuti in una Knowledge Base locale."""
-
     def __init__(self, root: str | Path, *, recursive: bool = True) -> None:
         self.root = Path(root)
         self.recursive = recursive
 
     def load(self) -> list[Document]:
-        """Carica tutti i documenti supportati in ordine deterministico."""
-        if not self.root.exists():
-            raise FileNotFoundError(f"Knowledge Base non trovata: {self.root}")
-        if not self.root.is_dir():
-            raise NotADirectoryError(f"Il percorso non è una directory: {self.root}")
+        if not self.root.exists() or not self.root.is_dir():
+            raise FileNotFoundError(f"Knowledge Base non trovata o non correttamente censita: {self.root}")
 
         iterator = self.root.rglob("*") if self.recursive else self.root.glob("*")
         paths = sorted(

@@ -7,13 +7,8 @@ MARKDOWN_HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*$")
 class SectionAwareChunker:
     #Chunking dei documetni
     def __init__(self, chunk_size: int, chunk_overlap: int = 0) -> None:
-        if chunk_size <= 0:
-            raise ValueError("chunk_size deve essere maggiore di zero")
-        if chunk_overlap < 0:
-            raise ValueError("chunk_overlap non può essere negativo")
-        if chunk_overlap >= chunk_size:
-            raise ValueError("chunk_overlap deve essere minore di chunk_size")
-
+        if chunk_size <= 0 or chunk_overlap < 0 or chunk_overlap >= chunk_size:
+            raise ValueError("Errore in fase di chunking")
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 

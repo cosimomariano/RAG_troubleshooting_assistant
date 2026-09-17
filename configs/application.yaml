@@ -37,7 +37,12 @@ masking:
     - iban
     - private_ipv4
 
-#embeddings:
+embeddings:
+  provider: sentence_transformers
+  model: ${EMBEDDING_MODEL}
+  batch_size: 32
+  normalize: true
+
 #retrieval:
 #generation:
 #incident_analyzer:
