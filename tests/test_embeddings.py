@@ -4,8 +4,10 @@ import pytest
 
 from app.indexing import EmbeddingModel, SentenceTransformerEmbeddingModel
 
- ## UTILIZZO UN SENTENCE TRANSFORMER MOCKATO PER NON SOVRACCARICARE LA CPU NELLA FASE DI TEST IN QUANTO NON NECESSARIO
-class FakeSentenceTransformer:
+
+class RecordingEncoder:
+    """Backend leggero: registra la chiamata senza caricare un modello reale."""
+
     def __init__(self, vectors: Sequence[Sequence[float]] | None = None) -> None:
         self.vectors = vectors
         self.calls: list[dict[str, object]] = []
@@ -28,37 +30,40 @@ class FakeSentenceTransformer:
                 "normalize_embeddings": normalize_embeddings,
             }
         )
-        if self.vectors is not None:
-            return self.vectors
-        return [[len(text), index] for index, text in enumerate(sentences)]
+        return self.vectors if self.vectors is not None else []
 
 
-def test_adapter_implements_embedding_model_protocol() -> None:
-    adapter = SentenceTransformerEmbeddingModel(
-        "synthetic-embedding-model",
-        backend=FakeSentenceTransformer(),
+def test_sentence_transformer_adapter_respects_embedding_contract() -> None:
+    model = SentenceTransformerEmbeddingModel(
+        "test-bi-encoder",
+        backend=RecordingEncoder(),
     )
 
-    assert isinstance(adapter, EmbeddingModel)
-    assert adapter.model_name == "synthetic-embedding-model"
+    assert isinstance(model, EmbeddingModel)
+    assert model.model_name == "test-bi-encoder"
 
 
-def test_texts_are_encoded_in_one_configured_batch() -> None:
-    backend = FakeSentenceTransformer()
-    adapter = SentenceTransformerEmbeddingModel(
-        "synthetic-embedding-model",
-        batch_size=2,
+def test_runbook_chunks_are_sent_to_backend_as_a_single_batch() -> None:
+    expected_vectors = [[0.12, 0.98], [0.87, 0.14]]
+    backend = RecordingEncoder(vectors=expected_vectors)
+    model = SentenceTransformerEmbeddingModel(
+        "test-bi-encoder",
+        batch_size=8,
         normalize_embeddings=True,
         backend=backend,
     )
+    chunks = [
+        "Il servizio checkout non raggiunge payment.",
+        "Verificare endpoint e disponibilità del servizio payment.",
+    ]
 
-    vectors = adapter.encode(["errore gateway", "timeout database"])
+    vectors = model.encode(chunks)
 
-    assert vectors == [[14.0, 0.0], [16.0, 1.0]]
+    assert vectors == expected_vectors
     assert backend.calls == [
         {
-            "sentences": ["errore gateway", "timeout database"],
-            "batch_size": 2,
+            "sentences": chunks,
+            "batch_size": 8,
             "show_progress_bar": False,
             "convert_to_numpy": True,
             "normalize_embeddings": True,
@@ -66,48 +71,62 @@ def test_texts_are_encoded_in_one_configured_batch() -> None:
     ]
 
 
-def test_normalization_option_is_forwarded_to_backend() -> None:
-    backend = FakeSentenceTransformer()
-    adapter = SentenceTransformerEmbeddingModel(
-        "synthetic-embedding-model",
+def test_normalization_can_be_disabled_for_embedding_experiments() -> None:
+    backend = RecordingEncoder(vectors=[[0.4, 0.6]])
+    model = SentenceTransformerEmbeddingModel(
+        "test-bi-encoder",
         normalize_embeddings=False,
         backend=backend,
     )
 
-    adapter.encode(["testo sintetico"])
+    model.encode(["Errore HTTP 500 restituito dal servizio cart."])
 
     assert backend.calls[0]["normalize_embeddings"] is False
 
 
-def test_empty_batch_does_not_call_backend() -> None:
-    backend = FakeSentenceTransformer()
-    adapter = SentenceTransformerEmbeddingModel(
-        "synthetic-embedding-model",
+def test_empty_chunk_collection_skips_model_inference() -> None:
+    backend = RecordingEncoder()
+    model = SentenceTransformerEmbeddingModel(
+        "test-bi-encoder",
         backend=backend,
     )
 
-    assert adapter.encode([]) == []
+    assert model.encode([]) == []
     assert backend.calls == []
 
 
 @pytest.mark.parametrize(
     ("model_name", "batch_size"),
-    [("", 32), ("   ", 32), ("synthetic-embedding-model", 0), ("model", -1)],
+    [
+        pytest.param("", 32, id="nome-modello-vuoto"),
+        pytest.param("   ", 32, id="nome-modello-con-soli-spazi"),
+        pytest.param("test-bi-encoder", 0, id="batch-size-zero"),
+        pytest.param("test-bi-encoder", -1, id="batch-size-negativo"),
+    ],
 )
-def test_invalid_configuration_is_rejected(model_name: str, batch_size: int) -> None:
+def test_invalid_embedding_configuration_is_rejected(
+    model_name: str,
+    batch_size: int,
+) -> None:
     with pytest.raises(ValueError):
         SentenceTransformerEmbeddingModel(
             model_name,
             batch_size=batch_size,
-            backend=FakeSentenceTransformer(),
+            backend=RecordingEncoder(),
         )
 
 
-def test_backend_must_return_one_vector_per_text() -> None:
-    adapter = SentenceTransformerEmbeddingModel(
-        "synthetic-embedding-model",
-        backend=FakeSentenceTransformer(vectors=[[1.0, 0.0]]),
+def test_backend_cannot_drop_a_chunk_from_the_batch() -> None:
+    backend = RecordingEncoder(vectors=[[0.2, 0.8]])
+    model = SentenceTransformerEmbeddingModel(
+        "test-bi-encoder",
+        backend=backend,
     )
 
-    with pytest.raises(ValueError, match="un embedding per ogni testo"):
-        adapter.encode(["primo testo", "secondo testo"])
+    with pytest.raises(ValueError):
+        model.encode(
+            [
+                "Sintomo osservato nel servizio checkout.",
+                "Verifica suggerita per il servizio payment.",
+            ]
+        )
