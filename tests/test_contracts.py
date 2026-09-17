@@ -21,7 +21,7 @@ def test_openapi_contract_is_valid() -> None:
 def test_base_application_configuration_loads() -> None:
     configuration = load_yaml("configs/application.yaml")
 
-    assert set(configuration) == { "application", "server", "logging", "llm", "ingestion", "chunking", "masking"}
+    assert set(configuration) == { "application", "server", "logging", "llm", "ingestion", "chunking", "masking", "embeddings"}
     assert configuration["application"]["name"] == "rag-troubleshooting-assistant"
     assert configuration["ingestion"]["supported_extensions"] == [".md", ".txt"]
     assert (configuration["chunking"]["chunk_overlap_characters"] < configuration["chunking"]["chunk_size_characters"])
@@ -29,6 +29,7 @@ def test_base_application_configuration_loads() -> None:
         "enabled": True,
         "categories": ["credentials", "email", "iban", "private_ipv4"],
     }
+    assert configuration["embeddings"] == { "provider": "sentence_transformers", "model": "${EMBEDDING_MODEL}", "batch_size": 32, "normalize": True,}
 
 def test_environment_placeholders_are_documented() -> None:
     configuration = (PROJECT_ROOT / "configs/application.yaml").read_text(encoding="utf-8")
