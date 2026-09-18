@@ -30,6 +30,7 @@ def test_configuration_exposes_only_components_available_at_this_stage() -> None
     "masking",
     "embeddings",
     "vector_store",
+    "retrieval",
     }
     assert configuration["application"]["name"] == "rag-troubleshooting-assistant"
     assert configuration["ingestion"]["supported_extensions"] == [".md", ".txt"]
@@ -51,6 +52,10 @@ def test_configuration_exposes_only_components_available_at_this_stage() -> None
         "provider": "faiss",
         "path": "${VECTOR_STORE_PATH}",
         "metric": "inner_product",
+    }
+    assert configuration["retrieval"] == {
+        "mode": "dense",
+        "top_k": "${RETRIEVAL_TOP_K}",
     }
 
 def test_every_configuration_placeholder_has_an_env_example_entry() -> None:

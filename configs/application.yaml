@@ -48,6 +48,9 @@ vector_store:
   path: ${VECTOR_STORE_PATH}
   metric: inner_product
 
-#retrieval:
+retrieval:
+  mode: dense
+  top_k: ${RETRIEVAL_TOP_K}
+
 #generation:
 #incident_analyzer:
