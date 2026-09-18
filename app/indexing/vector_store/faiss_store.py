@@ -7,6 +7,7 @@ from typing import Any
 import faiss
 import numpy as np
 from app.indexing.embeddings import EmbeddingVector
+from app.indexing.vector_store.base import VectorSearchMatch
 from app.models import DocumentChunk
 
 _INDEX_FILE_NAME = "dense.index"
@@ -80,6 +81,38 @@ class FaissVectorIndex:
         if position < 0 or position >= self.size:
             raise IndexError("La posizione richiesta non esiste nell'indice.")
         return self._chunks[position]
+
+    def search(self, vector: EmbeddingVector, k: int) -> list[VectorSearchMatch]:
+        """Calcolo posizione e score dei vectors piu vicini"""
+
+        if k <= 0:
+            raise ValueError("Il numero di risultati deve essere maggiore di zero.")
+        if self.size == 0:
+            return []
+
+        try:
+            query_matrix = np.asarray([vector], dtype=np.float32)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Il vettore di ricerca deve contenere valori numerici.") from exc
+
+        if query_matrix.ndim != 2 or query_matrix.shape[1] != self.dimension:
+            raise ValueError(
+                f"Il vettore di ricerca deve avere dimensione {self.dimension}; "
+                f"forma ricevuta: {query_matrix.shape}."
+            )
+        if not np.isfinite(query_matrix).all():
+            raise ValueError("Il vettore di ricerca contiene valori non finiti.")
+
+        result_count = min(k, self.size)
+        scores, positions = self._index.search(
+            np.ascontiguousarray(query_matrix),
+            result_count,
+        )
+        return [
+            (int(position), float(score))
+            for position, score in zip(positions[0], scores[0], strict=True)
+            if position >= 0
+        ]
 
     def save(self, directory_path: Path) -> None:
         """Salva un indice sullo store"""

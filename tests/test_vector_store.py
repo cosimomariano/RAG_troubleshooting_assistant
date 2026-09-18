@@ -83,6 +83,34 @@ def test_get_chunk_rejects_positions_outside_the_index() -> None:
     with pytest.raises(IndexError):
         index.get_chunk(-1)
 
+def test_search_returns_positions_ordered_by_inner_product() -> None:
+    index = FaissVectorIndex(dimension=3)
+    chunks = [
+        build_chunk("checkout-timeout", "Timeout durante il pagamento."),
+        build_chunk("cart-empty", "Il carrello risulta vuoto."),
+        build_chunk("payment-unreachable", "Il servizio payment non è raggiungibile."),
+    ]
+    index.add(chunks, [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.8, 0.6, 0.0]],)
+
+    matches = index.search([1.0, 0.0, 0.0], k=2)
+
+    assert [position for position, _ in matches] == [0, 2]
+    assert [score for _, score in matches] == pytest.approx([1.0, 0.8])
+
+def test_search_never_returns_empty_faiss_positions() -> None:
+    index = FaissVectorIndex(dimension=3)
+    chunk = build_chunk("checkout-timeout", "Timeout durante il pagamento.")
+    index.add([chunk], [[1.0, 0.0, 0.0]])
+
+    assert index.search([1.0, 0.0, 0.0], k=5) == [(0, 1.0)]
+
+@pytest.mark.parametrize("k", [0, -1])
+def test_search_result_count_must_be_positive(k: int) -> None:
+    index = FaissVectorIndex(dimension=3)
+
+    with pytest.raises(ValueError, match="maggiore di zero"):
+        index.search([1.0, 0.0, 0.0], k=k)
+
 def test_saved_index_can_be_loaded_without_losing_chunk_mapping(
     tmp_path: Path,
 ) -> None:

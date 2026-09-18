@@ -7,6 +7,8 @@ from typing import Protocol, Self, runtime_checkable
 from app.indexing.embeddings.base import EmbeddingVector
 from app.models.documents import DocumentChunk
 
+VectorSearchMatch = tuple[int, float]
+
 
 @runtime_checkable
 class PersistentVectorIndex(Protocol):
@@ -25,6 +27,8 @@ class PersistentVectorIndex(Protocol):
     ) -> None: ...
 
     def get_chunk(self, position: int) -> DocumentChunk: ...
+
+    def search(self, vector: EmbeddingVector, k: int) -> list[VectorSearchMatch]: ...
 
     def save(self, directory_path: Path) -> None: ...
 
