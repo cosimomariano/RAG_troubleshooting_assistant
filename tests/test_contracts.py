@@ -1,6 +1,5 @@
 import re
 from pathlib import Path
-
 import yaml
 from openapi_spec_validator import OpenAPIV31SpecValidator, validate
 
@@ -22,14 +21,15 @@ def test_configuration_exposes_only_components_available_at_this_stage() -> None
     configuration = load_yaml("configs/application.yaml")
 
     assert set(configuration) == {
-        "application",
-        "server",
-        "logging",
-        "llm",
-        "ingestion",
-        "chunking",
-        "masking",
-        "embeddings",
+    "application",
+    "server",
+    "logging",
+    "llm",
+    "ingestion",
+    "chunking",
+    "masking",
+    "embeddings",
+    "vector_store",
     }
     assert configuration["application"]["name"] == "rag-troubleshooting-assistant"
     assert configuration["ingestion"]["supported_extensions"] == [".md", ".txt"]
@@ -46,6 +46,11 @@ def test_configuration_exposes_only_components_available_at_this_stage() -> None
         "model": "${EMBEDDING_MODEL}",
         "batch_size": 32,
         "normalize": True,
+    }
+    assert configuration["vector_store"] == {
+        "provider": "faiss",
+        "path": "${VECTOR_STORE_PATH}",
+        "metric": "inner_product",
     }
 
 def test_every_configuration_placeholder_has_an_env_example_entry() -> None:
