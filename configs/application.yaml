@@ -43,6 +43,11 @@ embeddings:
   batch_size: 32
   normalize: true
 
+vector_store:
+  provider: faiss
+  path: ${VECTOR_STORE_PATH}
+  metric: inner_product
+
 #retrieval:
 #generation:
 #incident_analyzer:
