@@ -16,7 +16,7 @@ from app.services import RAGService
 
 KNOWLEDGE_BASE = Path(__file__).resolve().parents[1] / "fixtures" / "knowledge_base"
 
-
+# Mock
 class DeterministicEmbeddingModel:
     model_name = "embedding-deterministico-per-test"
 
