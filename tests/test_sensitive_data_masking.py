@@ -62,6 +62,15 @@ def test_internal_service_address_is_hidden_but_public_resolver_is_kept(
         "il resolver configurato è 8.8.8.8."
     )
 
+def test_private_ipv4_is_hidden_when_followed_by_sentence_period(
+    default_masker: RegexSensitiveDataMasker,
+) -> None:
+    text = "Il servizio payment risponde da 10.23.4.5."
+
+    assert default_masker.mask(text) == (
+        "Il servizio payment risponde da [MASCHERATO:IP_PRIVATO]."
+    )
+
 def test_reprocessing_masked_text_does_not_change_it_again(
     default_masker: RegexSensitiveDataMasker,
 ) -> None:
