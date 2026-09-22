@@ -14,7 +14,7 @@ llm:
   provider: ollama
   base_url: ${OLLAMA_BASE_URL}
   model: ${OLLAMA_MODEL}
-  timeout_seconds: 120
+  timeout_seconds: ${OLLAMA_TIMEOUT_SECONDS}
 
 ingestion:
   knowledge_base_path: ${KNOWLEDGE_BASE_PATH}
