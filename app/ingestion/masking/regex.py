@@ -72,7 +72,7 @@ DEFAULT_MASKING_RULES = (
             r"(?<![\d.])"
             r"(?:25[0-5]|2[0-4]\d|1?\d?\d)"
             r"(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}"
-            r"(?![\d.])"
+            r"(?!\d)(?!\.\d)"
         ),
         replacement=_mask_private_ipv4,
     ),
