@@ -132,5 +132,5 @@ def test_question_and_incident_context_are_trimmed() -> None:
 
 @pytest.mark.parametrize("question", ["", "   "])
 def test_empty_question_is_rejected(question: str) -> None:
-    with pytest.raises(ValueError, match="domanda non può essere vuota"):
+    with pytest.raises(ValueError, match="Domanda non valorizzata."):
         PromptBuilder().build(question=question, documents=[])
