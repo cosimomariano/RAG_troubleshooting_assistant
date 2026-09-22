@@ -71,7 +71,13 @@ def test_connection_error_is_reported_as_unavailable_service() -> None:
         raise httpx.ConnectError("Connessione simulata non disponibile", request=request)
 
     ollama_client, http_client = build_client(httpx.MockTransport(handle_request))
-    with http_client, pytest.raises(LLMServiceUnavailableError, match="Il servizio Ollama remoto è attualmente non raggiungibile"):
+    with (
+        http_client,
+        pytest.raises(
+            LLMServiceUnavailableError,
+            match="Il servizio Ollama remoto è attualmente non raggiungibile",
+        ),
+    ):
         ollama_client.generate("Analizza l'incidente.")
 
 

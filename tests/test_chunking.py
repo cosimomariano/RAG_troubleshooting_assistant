@@ -1,6 +1,8 @@
 import pytest
+
 from app.ingestion import SectionAwareChunker
 from app.models import Document, SourceMetadata
+
 
 def make_payment_runbook(
     text: str,
@@ -19,6 +21,7 @@ def make_payment_runbook(
         ),
     )
 
+
 def test_same_runbook_produces_same_chunks_and_identifiers() -> None:
     runbook = make_payment_runbook(
         "# Errore di connessione\n" + "connection refused verso payment. " * 12
@@ -31,6 +34,7 @@ def test_same_runbook_produces_same_chunks_and_identifiers() -> None:
     assert first_run == second_run
     assert [chunk.id for chunk in first_run] == [chunk.id for chunk in second_run]
 
+
 def test_markdown_headings_are_preserved_as_chunk_sections() -> None:
     runbook = make_payment_runbook(
         "# Sintomi\nIl checkout riceve connection refused.\n"
@@ -42,6 +46,7 @@ def test_markdown_headings_are_preserved_as_chunk_sections() -> None:
     assert [chunk.metadata.section for chunk in chunks] == ["Sintomi", "Verifiche"]
     assert chunks[0].text.startswith("# Sintomi")
     assert chunks[1].text.startswith("# Verifiche")
+
 
 def test_chunk_keeps_document_and_service_provenance() -> None:
     operational_note = make_payment_runbook(
@@ -57,6 +62,7 @@ def test_chunk_keeps_document_and_service_provenance() -> None:
     assert chunk.metadata.service == "payment"
     assert chunk.metadata.section == "Procedura operativa"
 
+
 def test_overlap_keeps_boundary_text_in_adjacent_chunks() -> None:
     note = make_payment_runbook("checkoutpaymentdown", document_type="text")
 
@@ -65,6 +71,7 @@ def test_overlap_keeps_boundary_text_in_adjacent_chunks() -> None:
     assert [chunk.text for chunk in chunks] == ["checkoutpa", "paymentdow", "own"]
     assert chunks[0].text[-2:] == chunks[1].text[:2] == "pa"
     assert chunks[1].text[-2:] == chunks[2].text[:2] == "ow"
+
 
 @pytest.mark.parametrize(
     "text",
@@ -78,6 +85,7 @@ def test_blank_document_does_not_create_retrievable_chunks(text: str) -> None:
     document = make_payment_runbook(text)
 
     assert SectionAwareChunker(chunk_size=100).chunk(document) == []
+
 
 @pytest.mark.parametrize(
     ("chunk_size", "chunk_overlap"),

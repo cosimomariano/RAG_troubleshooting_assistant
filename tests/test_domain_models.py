@@ -1,6 +1,8 @@
 import pytest
 from pydantic import ValidationError
+
 from app.models import Document, DocumentChunk, RetrievalResult, SourceMetadata
+
 
 def payment_runbook_metadata() -> SourceMetadata:
     return SourceMetadata(
@@ -10,6 +12,7 @@ def payment_runbook_metadata() -> SourceMetadata:
         section="Possibili cause",
     )
 
+
 def payment_diagnostic_chunk() -> DocumentChunk:
     return DocumentChunk(
         id="payment-runbook-0001",
@@ -17,6 +20,7 @@ def payment_diagnostic_chunk() -> DocumentChunk:
         text="Verificare che il servizio payment sia raggiungibile dal checkout.",
         metadata=payment_runbook_metadata(),
     )
+
 
 def test_empty_runbook_can_be_loaded_before_content_validation() -> None:
     document = Document(
@@ -28,12 +32,14 @@ def test_empty_runbook_can_be_loaded_before_content_validation() -> None:
     assert document.text == ""
     assert document.metadata.source == "runbooks/payment-unreachable.md"
 
+
 def test_chunk_points_back_to_payment_runbook() -> None:
     chunk = payment_diagnostic_chunk()
 
     assert chunk.document_id == "payment-runbook"
     assert chunk.metadata.service == "payment"
     assert chunk.metadata.section == "Possibili cause"
+
 
 def test_empty_text_cannot_be_indexed_as_a_chunk() -> None:
     with pytest.raises(ValidationError):
@@ -43,6 +49,7 @@ def test_empty_text_cannot_be_indexed_as_a_chunk() -> None:
             text="",
             metadata=payment_runbook_metadata(),
         )
+
 
 def test_dense_result_records_score_rank_and_originating_retriever() -> None:
     result = RetrievalResult(
@@ -55,6 +62,7 @@ def test_dense_result_records_score_rank_and_originating_retriever() -> None:
     assert result.rank == 1
     assert result.score == pytest.approx(0.91)
     assert result.retriever == "dense"
+
 
 def test_rank_zero_is_not_a_valid_search_position() -> None:
     with pytest.raises(ValidationError):

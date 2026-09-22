@@ -1,8 +1,11 @@
 from collections.abc import Sequence
+
 import pytest
+
 from app.indexing import EmbeddingVector, FaissVectorIndex
 from app.models import DocumentChunk, SourceMetadata
 from app.retrieval import DenseRetriever, Retriever
+
 
 class QueryEmbeddingModel:
     def __init__(self, vectors: list[EmbeddingVector]) -> None:
@@ -13,6 +16,7 @@ class QueryEmbeddingModel:
     def encode(self, texts: Sequence[str]) -> list[EmbeddingVector]:
         self.encoded_batches.append(list(texts))
         return self.vectors
+
 
 def build_runbook_chunk(chunk_id: str, text: str) -> DocumentChunk:
     return DocumentChunk(
@@ -26,6 +30,7 @@ def build_runbook_chunk(chunk_id: str, text: str) -> DocumentChunk:
             section="diagnosi",
         ),
     )
+
 
 def build_checkout_index() -> FaissVectorIndex:
     index = FaissVectorIndex(dimension=3)
@@ -48,6 +53,7 @@ def build_checkout_index() -> FaissVectorIndex:
     )
     return index
 
+
 def test_dense_retriever_satisfies_common_retriever_contract() -> None:
     retriever = DenseRetriever(
         embedding_model=QueryEmbeddingModel([[1.0, 0.0, 0.0]]),
@@ -55,6 +61,7 @@ def test_dense_retriever_satisfies_common_retriever_contract() -> None:
     )
 
     assert isinstance(retriever, Retriever)
+
 
 def test_query_is_embedded_and_nearest_chunks_are_ranked() -> None:
     embedding_model = QueryEmbeddingModel([[1.0, 0.0, 0.0]])
@@ -77,6 +84,7 @@ def test_query_is_embedded_and_nearest_chunks_are_ranked() -> None:
     assert [result.score for result in results] == pytest.approx([1.0, 0.8])
     assert {result.retriever for result in results} == {"dense"}
 
+
 def test_top_k_larger_than_index_returns_only_available_chunks() -> None:
     retriever = DenseRetriever(
         embedding_model=QueryEmbeddingModel([[1.0, 0.0, 0.0]]),
@@ -88,6 +96,7 @@ def test_top_k_larger_than_index_returns_only_available_chunks() -> None:
     assert len(results) == 3
     assert [result.rank for result in results] == [1, 2, 3]
 
+
 def test_empty_index_does_not_invoke_embedding_model() -> None:
     embedding_model = QueryEmbeddingModel([[1.0, 0.0, 0.0]])
     retriever = DenseRetriever(
@@ -97,6 +106,7 @@ def test_empty_index_does_not_invoke_embedding_model() -> None:
 
     assert retriever.retrieve("Errore nel checkout", k=3) == []
     assert embedding_model.encoded_batches == []
+
 
 def test_embedding_model_must_return_one_vector_for_the_query() -> None:
     retriever = DenseRetriever(

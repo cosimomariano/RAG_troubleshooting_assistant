@@ -1,9 +1,11 @@
 import re
 from pathlib import Path
+
 import yaml
 from openapi_spec_validator import OpenAPIV31SpecValidator, validate
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
 
 def load_yaml(relative_path: str) -> dict:
     content = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
@@ -12,25 +14,27 @@ def load_yaml(relative_path: str) -> dict:
     assert isinstance(document, dict)
     return document
 
+
 def test_troubleshooting_openapi_is_a_valid_version_31_contract() -> None:
     specification = load_yaml("contracts/openapi/troubleshooting-api.yaml")
 
     validate(specification, cls=OpenAPIV31SpecValidator)
 
+
 def test_configuration_exposes_only_components_available_at_this_stage() -> None:
     configuration = load_yaml("configs/application.yaml")
 
     assert set(configuration) == {
-    "application",
-    "server",
-    "logging",
-    "llm",
-    "ingestion",
-    "chunking",
-    "masking",
-    "embeddings",
-    "vector_store",
-    "retrieval",
+        "application",
+        "server",
+        "logging",
+        "llm",
+        "ingestion",
+        "chunking",
+        "masking",
+        "embeddings",
+        "vector_store",
+        "retrieval",
     }
     assert configuration["application"]["name"] == "rag-troubleshooting-assistant"
     assert configuration["ingestion"]["supported_extensions"] == [".md", ".txt"]
@@ -57,6 +61,7 @@ def test_configuration_exposes_only_components_available_at_this_stage() -> None
         "mode": "dense",
         "top_k": "${RETRIEVAL_TOP_K}",
     }
+
 
 def test_every_configuration_placeholder_has_an_env_example_entry() -> None:
     configuration = (PROJECT_ROOT / "configs/application.yaml").read_text(encoding="utf-8")

@@ -1,10 +1,14 @@
 from datetime import datetime
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, Field
-from app.models import RAGResponse, SourceReference
 
-class StrictApiModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+from pydantic import Field
+
+from app.models import RAGResponse, SourceReference, StrictModel
+
+
+class StrictApiModel(StrictModel):
+    pass
+
 
 class LogEvidence(StrictApiModel):
     timestamp: datetime | None = Field(
@@ -27,6 +31,7 @@ class LogEvidence(StrictApiModel):
         default=None,
         description="Tipo di errore o eccezione, se disponibile.",
     )
+
 
 class SpanEvidence(StrictApiModel):
     span_id: str | None = Field(
@@ -53,6 +58,7 @@ class SpanEvidence(StrictApiModel):
         description="Messaggio di errore associato allo span, se disponibile.",
     )
 
+
 class MetricEvidence(StrictApiModel):
     service: str | None = Field(
         default=None,
@@ -67,6 +73,7 @@ class MetricEvidence(StrictApiModel):
         default=None,
         description="Unità di misura della metrica, se disponibile.",
     )
+
 
 class TelemetryContext(StrictApiModel):
     trace_id: str | None = Field(
@@ -86,6 +93,7 @@ class TelemetryContext(StrictApiModel):
         description="Metriche considerate rilevanti per l'incidente.",
     )
 
+
 class TroubleshootingRequest(StrictApiModel):
     question: str = Field(
         min_length=1,
@@ -103,6 +111,7 @@ class TroubleshootingRequest(StrictApiModel):
         default=None,
         description="Evidenze di telemetria normalizzate relative all'incidente.",
     )
+
 
 class TroubleshootingResponse(StrictApiModel):
     answer: str = Field(
@@ -122,6 +131,7 @@ class TroubleshootingResponse(StrictApiModel):
         """Converte il risultato interno del RAG nel body pubblico dell'API."""
 
         return cls.model_validate(response.model_dump())
+
 
 class ErrorResponse(StrictApiModel):
     code: str = Field(

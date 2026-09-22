@@ -1,76 +1,148 @@
 import re
 from hashlib import sha256
-from app.models import Document, DocumentChunk
 
-MARKDOWN_HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*$")
+from app.models import Document, DocumentChunk, SourceMetadata
+
+MARKDOWN_HEADING_PATTERN = re.compile(r"^#{1,6}\s+(.+?)\s*$")
+
 
 class SectionAwareChunker:
-    #Chunking dei documetni
     def __init__(self, chunk_size: int, chunk_overlap: int = 0) -> None:
-        if chunk_size <= 0 or chunk_overlap < 0 or chunk_overlap >= chunk_size:
-            raise ValueError("Errore in fase di chunking")
-        self.chunk_size = chunk_size
-        self.chunk_overlap = chunk_overlap
+        self._validate_configuration(chunk_size, chunk_overlap)
+        self._chunk_size = chunk_size
+        self._chunk_overlap = chunk_overlap
+
+    @property
+    def chunk_size(self) -> int:
+        return self._chunk_size
+
+    @property
+    def chunk_overlap(self) -> int:
+        return self._chunk_overlap
 
     def chunk(self, document: Document) -> list[DocumentChunk]:
         chunks: list[DocumentChunk] = []
+        document_sections = self._split_sections(document)
 
-        for section, section_text in self._split_sections(document):
-            for chunk_text in self._split_text(section_text):
+        for section_name, section_text in document_sections:
+            text_fragments = self._split_text(section_text)
+            for text_fragment in text_fragments:
                 position = len(chunks)
-                identifier = self._build_chunk_id( document_id=document.id, section=section, position=position, text=chunk_text)
-                metadata = document.metadata.model_copy(update={"section": section})
-                chunks.append(
-                    DocumentChunk( id=identifier, document_id=document.id, text=chunk_text, metadata=metadata)
+                chunk = self._create_chunk(
+                    document=document,
+                    section_name=section_name,
+                    position=position,
+                    text=text_fragment,
                 )
+                chunks.append(chunk)
 
         return chunks
 
-    ## SPLIT DELLE SEZIONI
+    def _create_chunk(
+        self,
+        document: Document,
+        section_name: str | None,
+        position: int,
+        text: str,
+    ) -> DocumentChunk:
+        chunk_id = self._build_chunk_id(
+            document_id=document.id,
+            section=section_name,
+            position=position,
+            text=text,
+        )
+        metadata = self._copy_metadata(document.metadata, section_name)
+        return DocumentChunk(
+            id=chunk_id,
+            document_id=document.id,
+            text=text,
+            metadata=metadata,
+        )
+
+    @staticmethod
+    def _copy_metadata(
+        metadata: SourceMetadata,
+        section_name: str | None,
+    ) -> SourceMetadata:
+        return metadata.model_copy(update={"section": section_name})
 
     def _split_sections(self, document: Document) -> list[tuple[str | None, str]]:
         if document.metadata.document_type != "markdown":
             return [(document.metadata.section, document.text)]
 
         sections: list[tuple[str | None, str]] = []
-        current_section = document.metadata.section
-        current_lines: list[str] = []
+        current_section_name = document.metadata.section
+        current_section_lines: list[str] = []
 
         for line in document.text.splitlines(keepends=True):
-            heading = MARKDOWN_HEADING.match(line.rstrip("\r\n"))
-            if heading:
-                if "".join(current_lines).strip():
-                    sections.append((current_section, "".join(current_lines)))
-                current_section = heading.group(1).strip()
-                current_lines = [line]
-            else:
-                current_lines.append(line)
+            heading_match = MARKDOWN_HEADING_PATTERN.match(line.rstrip("\r\n"))
+            if heading_match is None:
+                current_section_lines.append(line)
+                continue
 
-        if "".join(current_lines).strip():
-            sections.append((current_section, "".join(current_lines)))
+            self._append_section(
+                sections,
+                current_section_name,
+                current_section_lines,
+            )
+            current_section_name = heading_match.group(1).strip()
+            current_section_lines = [line]
 
+        self._append_section(
+            sections,
+            current_section_name,
+            current_section_lines,
+        )
         return sections
 
-    ## SPLIT DEL TESTO CONTENUTO NELLE SEZIONI 
+    @staticmethod
+    def _append_section(
+        sections: list[tuple[str | None, str]],
+        section_name: str | None,
+        section_lines: list[str],
+    ) -> None:
+        section_text = "".join(section_lines)
+        if section_text.strip():
+            sections.append((section_name, section_text))
 
     def _split_text(self, text: str) -> list[str]:
         normalized_text = text.strip()
         if not normalized_text:
             return []
 
-        step = self.chunk_size - self.chunk_overlap
         chunks: list[str] = []
-        for start in range(0, len(normalized_text), step):
-            chunk_text = normalized_text[start : start + self.chunk_size].strip()
+        step = self._chunk_size - self._chunk_overlap
+        start = 0
+
+        while start < len(normalized_text):
+            end = start + self._chunk_size
+            chunk_text = normalized_text[start:end].strip()
             if chunk_text:
                 chunks.append(chunk_text)
-            if start + self.chunk_size >= len(normalized_text):
+            if end >= len(normalized_text):
                 break
+            start += step
 
         return chunks
 
-    ## METODO DI COMODO PER LA COSTRUZIONE DI UN CHUNK ID DA UTILIZZARE
     @staticmethod
-    def _build_chunk_id( document_id: str, section: str | None, position: int, text: str) -> str:
+    def _validate_configuration(chunk_size: int, chunk_overlap: int) -> None:
+        if chunk_size <= 0:
+            raise ValueError("La dimensione del chunk deve essere maggiore di zero.")
+        if chunk_overlap < 0:
+            raise ValueError("La sovrapposizione tra chunk non può essere negativa.")
+        if chunk_overlap >= chunk_size:
+            raise ValueError(
+                "La sovrapposizione tra chunk deve essere minore della dimensione del chunk."
+            )
+
+    @staticmethod
+    def _build_chunk_id(
+        document_id: str,
+        section: str | None,
+        position: int,
+        text: str,
+    ) -> str:
         payload = f"{document_id}\0{section or ''}\0{position}\0{text}"
-        return f"chunk-{sha256(payload.encode('utf-8')).hexdigest()}"
+        digest = sha256(payload.encode("utf-8")).hexdigest()
+        return f"chunk-{digest}"

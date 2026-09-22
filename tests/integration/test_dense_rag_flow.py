@@ -1,9 +1,12 @@
 """Smoke test del percorso completo del primo Dense RAG."""
+
 import json
 from collections.abc import Sequence
 from pathlib import Path
+
 import httpx
 from fastapi.testclient import TestClient
+
 from app.api import create_app
 from app.generation import OllamaLLMClient, PromptBuilder
 from app.indexing import EmbeddingVector, FaissVectorIndex
@@ -12,6 +15,7 @@ from app.retrieval import DenseRetriever
 from app.services import RAGService
 
 KNOWLEDGE_BASE = Path(__file__).resolve().parents[1] / "fixtures" / "knowledge_base"
+
 
 class DeterministicEmbeddingModel:
     model_name = "embedding-deterministico-per-test"
@@ -30,6 +34,7 @@ class DeterministicEmbeddingModel:
         if "cart" in normalized_text or "carrello" in normalized_text:
             return [0.0, 1.0, 0.0]
         return [0.0, 0.0, 1.0]
+
 
 def build_persistent_index(
     index_path: Path,
@@ -53,6 +58,7 @@ def build_persistent_index(
 
     return FaissVectorIndex.load(index_path)
 
+
 def test_dense_rag_request_reaches_mocked_ollama_with_retrieved_evidence(
     tmp_path: Path,
 ) -> None:
@@ -70,7 +76,10 @@ def test_dense_rag_request_reaches_mocked_ollama_with_retrieved_evidence(
         return httpx.Response(
             200,
             json={
-                "response": ("Il checkout non completa il pagamento perché il servizio payment non è raggiungibile."),
+                "response": (
+                    "Il checkout non completa il pagamento perché il servizio "
+                    "payment non è raggiungibile."
+                ),
                 "done": True,
             },
         )
@@ -95,14 +104,18 @@ def test_dense_rag_request_reaches_mocked_ollama_with_retrieved_evidence(
                 "/troubleshoot",
                 json={
                     "question": "Perché checkout non completa il pagamento?",
-                    "incident_context": ("La chiamata payment/charge restituisce connection refused."),
+                    "incident_context": (
+                        "La chiamata payment/charge restituisce connection refused."
+                    ),
                     "service": "checkout",
                 },
             )
 
     assert response.status_code == 200
     response_body = response.json()
-    assert response_body["answer"] == ("Il checkout non completa il pagamento perché il servizio payment non è raggiungibile." )
+    assert response_body["answer"] == (
+        "Il checkout non completa il pagamento perché il servizio payment non è raggiungibile."
+    )
     assert response_body["latency_ms"] >= 0
     assert len(response_body["sources"]) == 1
     assert response_body["sources"][0]["source"] == "runbooks/payment-unreachable.md"

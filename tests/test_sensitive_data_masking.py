@@ -1,15 +1,20 @@
 import re
+
 import pytest
+
 from app.ingestion import MaskingRule, RegexSensitiveDataMasker, SensitiveDataMasker
+
 
 @pytest.fixture
 def default_masker() -> RegexSensitiveDataMasker:
     return RegexSensitiveDataMasker()
 
+
 def test_regex_masker_can_be_used_through_common_contract(
     default_masker: RegexSensitiveDataMasker,
 ) -> None:
     assert isinstance(default_masker, SensitiveDataMasker)
+
 
 def test_on_call_email_is_removed_from_runbook_text(
     default_masker: RegexSensitiveDataMasker,
@@ -18,6 +23,7 @@ def test_on_call_email_is_removed_from_runbook_text(
     masked_line = default_masker.mask(runbook_line)
 
     assert masked_line == "Contattare [MASCHERATO:EMAIL] in caso di errore."
+
 
 @pytest.mark.parametrize(
     ("log_line", "expected_line"),
@@ -41,6 +47,7 @@ def test_credentials_are_removed_from_telemetry_lines(
 ) -> None:
     assert default_masker.mask(log_line) == expected_line
 
+
 def test_iban_like_value_is_not_sent_to_indexing(
     default_masker: RegexSensitiveDataMasker,
 ) -> None:
@@ -50,6 +57,7 @@ def test_iban_like_value_is_not_sent_to_indexing(
 
     assert masked_note == "IBAN usato nel test: [MASCHERATO:IBAN]."
 
+
 def test_internal_service_address_is_hidden_but_public_resolver_is_kept(
     default_masker: RegexSensitiveDataMasker,
 ) -> None:
@@ -58,18 +66,17 @@ def test_internal_service_address_is_hidden_but_public_resolver_is_kept(
     masked_line = default_masker.mask(log_line)
 
     assert masked_line == (
-        "payment risponde da [MASCHERATO:IP_PRIVATO]; "
-        "il resolver configurato è 8.8.8.8."
+        "payment risponde da [MASCHERATO:IP_PRIVATO]; il resolver configurato è 8.8.8.8."
     )
+
 
 def test_private_ipv4_is_hidden_when_followed_by_sentence_period(
     default_masker: RegexSensitiveDataMasker,
 ) -> None:
     text = "Il servizio payment risponde da 10.23.4.5."
 
-    assert default_masker.mask(text) == (
-        "Il servizio payment risponde da [MASCHERATO:IP_PRIVATO]."
-    )
+    assert default_masker.mask(text) == ("Il servizio payment risponde da [MASCHERATO:IP_PRIVATO].")
+
 
 def test_reprocessing_masked_text_does_not_change_it_again(
     default_masker: RegexSensitiveDataMasker,
@@ -81,6 +88,7 @@ def test_reprocessing_masked_text_does_not_change_it_again(
     assert default_masker.mask(log_line) == first_pass
     assert default_masker.mask(first_pass) == first_pass
 
+
 def test_project_specific_rule_can_replace_demo_incident_identifier() -> None:
     incident_rule = MaskingRule(
         name="demo_incident_id",
@@ -89,9 +97,8 @@ def test_project_specific_rule_can_replace_demo_incident_identifier() -> None:
     )
     masker = RegexSensitiveDataMasker(rules=[incident_rule])
 
-    assert masker.mask("Analizzare INC-DEMO-1234") == (
-        "Analizzare [MASCHERATO:INCIDENTE]"
-    )
+    assert masker.mask("Analizzare INC-DEMO-1234") == ("Analizzare [MASCHERATO:INCIDENTE]")
+
 
 @pytest.mark.parametrize(
     "text",

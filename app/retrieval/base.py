@@ -1,5 +1,7 @@
 from typing import Protocol, runtime_checkable
+
 from app.models import RetrievalResult
+
 
 @runtime_checkable
 class Retriever(Protocol):

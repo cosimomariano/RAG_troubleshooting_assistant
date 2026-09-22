@@ -2,9 +2,8 @@ import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from ipaddress import IPv4Address, IPv4Network
-from app.ingestion.masking.base import SensitiveDataMasker
 
- # Questa classe estende la classe base e viene richiamata da quest'ultima per le operazioni di mascheramento
+from app.ingestion.masking.base import SensitiveDataMasker
 
 MaskingReplacement = str | Callable[[re.Match[str]], str]
 
@@ -19,25 +18,32 @@ _PRIVATE_IPV4_NETWORKS = (
     IPv4Network("192.168.0.0/16"),
 )
 
+
 @dataclass(frozen=True, slots=True)
 class MaskingRule:
-    """Regex per il replace dei dati sensibili"""
-
     name: str
     pattern: re.Pattern[str]
     replacement: MaskingReplacement
 
+    def apply(self, text: str) -> str:
+        return self.pattern.sub(self.replacement, text)
+
+
 def _mask_labeled_credential(match: re.Match[str]) -> str:
     return f"{match.group(1)}{match.group(2)}{_CREDENTIAL_PLACEHOLDER}"
+
 
 def _mask_bearer_token(match: re.Match[str]) -> str:
     return f"{match.group(1)}{_CREDENTIAL_PLACEHOLDER}"
 
+
 def _mask_private_ipv4(match: re.Match[str]) -> str:
     address = IPv4Address(match.group(0))
-    if any(address in network for network in _PRIVATE_IPV4_NETWORKS):
-        return _PRIVATE_IPV4_PLACEHOLDER
+    for private_network in _PRIVATE_IPV4_NETWORKS:
+        if address in private_network:
+            return _PRIVATE_IPV4_PLACEHOLDER
     return match.group(0)
+
 
 DEFAULT_MASKING_RULES = (
     MaskingRule(
@@ -56,9 +62,7 @@ DEFAULT_MASKING_RULES = (
     ),
     MaskingRule(
         name="email",
-        pattern=re.compile(
-            r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?![\w.-])"
-        ),
+        pattern=re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?![\w.-])"),
         replacement=_EMAIL_PLACEHOLDER,
     ),
     MaskingRule(
@@ -78,12 +82,19 @@ DEFAULT_MASKING_RULES = (
     ),
 )
 
+
 class RegexSensitiveDataMasker(SensitiveDataMasker):
     def __init__(self, rules: Iterable[MaskingRule] | None = None) -> None:
-        self._rules = tuple(rules) if rules is not None else DEFAULT_MASKING_RULES
+        self._rules = self._resolve_rules(rules)
 
     def mask(self, text: str) -> str:
         masked_text = text
         for rule in self._rules:
-            masked_text = rule.pattern.sub(rule.replacement, masked_text)
+            masked_text = rule.apply(masked_text)
         return masked_text
+
+    @staticmethod
+    def _resolve_rules(rules: Iterable[MaskingRule] | None) -> tuple[MaskingRule, ...]:
+        if rules is None:
+            return DEFAULT_MASKING_RULES
+        return tuple(rules)

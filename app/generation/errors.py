@@ -1,10 +1,10 @@
-"""Modelli associati agli errori prodotti"""
+class LLMClientError(RuntimeError):
+    pass
 
-class LLMClientError(RuntimeError): ...
-   # Errore generico
 
-class LLMServiceUnavailableError(LLMClientError): ...
-    # Servizio non disponibile (es. timeout)
+class LLMServiceUnavailableError(LLMClientError):
+    pass
 
-class LLMResponseError(LLMClientError): ...
-    # Errore nella validazione della risposta (response non valida)
+
+class LLMResponseError(LLMClientError):
+    pass

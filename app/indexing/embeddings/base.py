@@ -3,6 +3,7 @@ from typing import Protocol, runtime_checkable
 
 EmbeddingVector = list[float]
 
+
 @runtime_checkable
 class EmbeddingModel(Protocol):
     @property
