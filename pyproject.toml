@@ -9,6 +9,7 @@ description = "Assistente RAG per il troubleshooting di applicazioni a microserv
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "fastapi>=0.115,<1.0",
     "pydantic>=2.12,<3.0",
     "PyYAML>=6.0,<7.0",
     "httpx>=0.28,<1.0",
