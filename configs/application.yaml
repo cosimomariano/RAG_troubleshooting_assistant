@@ -49,7 +49,7 @@ vector_store:
   metric: inner_product
 
 retrieval:
-  mode: dense
+  mode: ${RETRIEVAL_MODE}
   top_k: ${RETRIEVAL_TOP_K}
 
 #generation:
