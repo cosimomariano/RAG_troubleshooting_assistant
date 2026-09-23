@@ -2,5 +2,6 @@
 
 from app.retrieval.base import Retriever
 from app.retrieval.dense import DenseRetriever
+from app.retrieval.sparse import SparseRetriever
 
-__all__ = ["DenseRetriever", "Retriever"]
+__all__ = ["DenseRetriever", "Retriever", "SparseRetriever"]
