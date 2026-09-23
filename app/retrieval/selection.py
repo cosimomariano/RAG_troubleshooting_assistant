@@ -1,8 +1,10 @@
 from enum import StrEnum
 from app.retrieval.base import Retriever
+from app.retrieval.no_retrieval import NoRetrievalRetriever
 
 # Enum con le possibili modalita di recupero (vedi application.yml)
 class RetrievalMode(StrEnum):
+    LLM_ONLY = "llm_only"
     DENSE = "dense"
     SPARSE = "sparse"
 
@@ -14,6 +16,7 @@ class RetrieverSelector:
         sparse_retriever: Retriever,
     ) -> None:
         self._retrievers: dict[RetrievalMode, Retriever] = {
+            RetrievalMode.LLM_ONLY: NoRetrievalRetriever(),
             RetrievalMode.DENSE: dense_retriever,
             RetrievalMode.SPARSE: sparse_retriever,
         }
