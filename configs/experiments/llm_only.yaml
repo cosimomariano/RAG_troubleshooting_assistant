@@ -1,0 +1,6 @@
+experiment:
+  id: llm_only
+  description: Baseline con il solo LLM senza il recupero documentale
+
+retrieval:
+  mode: llm_only

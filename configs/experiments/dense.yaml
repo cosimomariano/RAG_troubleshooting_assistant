@@ -1,0 +1,6 @@
+experiment:
+  id: dense
+  description: RAG con retrieval denso tramite bi-encoder e libreria FAISS
+
+retrieval:
+  mode: dense

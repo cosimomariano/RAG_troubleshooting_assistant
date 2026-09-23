@@ -1,0 +1,6 @@
+experiment:
+  id: sparse
+  description: RAG con retrieval sparso tramite BM25
+
+retrieval:
+  mode: sparse
