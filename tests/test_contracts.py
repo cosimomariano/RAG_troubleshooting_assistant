@@ -58,7 +58,7 @@ def test_configuration_exposes_only_components_available_at_this_stage() -> None
         "metric": "inner_product",
     }
     assert configuration["retrieval"] == {
-        "mode": "dense",
+        "mode": "${RETRIEVAL_MODE}",
         "top_k": "${RETRIEVAL_TOP_K}",
     }
 
