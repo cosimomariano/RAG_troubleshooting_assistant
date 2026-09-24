@@ -59,7 +59,8 @@ La pipeline è separata in una fase offline di preparazione della conoscenza e u
 
 - **Query processing**: composizione della domanda con evidenze di telemetria già normalizzate, senza indicizzare indiscriminatamente i dati runtime grezzi.
 - **Dense Retrieval**: embedding della query e ricerca Top-K nell'indice FAISS. Implementato.
-- **Sparse e Hybrid Retrieval**: BM25, fusione e confronto tra graduatorie. Pianificato per i prossimi incrementi.
+- **Sparse Retrieval**: indicizzazione lessicale e ricerca Top-K tramite BM25. Implementato.
+- **Hybrid Retrieval**: fusione e confronto tra graduatorie dense e sparse. Pianificato per i prossimi incrementi.
 - **Fusion e reranking**: combinazione tramite RRF e riordinamento opzionale con Cross-Encoder.
 - **Prompt assembly**: unione di istruzioni, domanda, contesto dell'incidente, chunk recuperati e riferimenti alle fonti. (eventuale embed dei puntamenti alle fonti come prompt engineering strategy)
 - **Generazione**: invocazione REST di un LLM servito da Ollama su una macchina remota della rete privata.
@@ -73,13 +74,14 @@ La pipeline è separata in una fase offline di preparazione della conoscenza e u
 |   |-- generation/          # Prompt builder, interfaccia LLM e client Ollama
 |   |-- indexing/
 |   |   |-- embeddings/      # Astrazione e implementazione Sentence Transformers
+|   |   |-- sparse/          # Tokenizzazione tecnica e indice BM25
 |   |   |-- vector_store/    # Astrazione e indice persistente FAISS
 |   |-- ingestion/
 |   |   |-- chunking/        # Chunking section-aware
 |   |   |-- loaders/         # Caricamento dei documenti locali
 |   |   |-- masking/         # Mascheramento dei dati sensibili
 |   |-- models/              # Modelli di dominio
-|   |-- retrieval/           # Interfaccia Retriever e Dense Retriever
+|   |-- retrieval/           # Interfaccia e implementazioni Dense/Sparse Retriever
 |   |-- services/            # Orchestrazione del flusso RAG
 |-- configs/
 |   |-- application.yaml     # Configurazione applicativa progressiva
@@ -140,7 +142,7 @@ Per eseguire tutti i test:
 ```powershell
 python -m pytest -q
 ```
-La suite attuale comprende **105 casi di test**.
+La suite attuale comprende **116 casi di test**.
 
 ## Note sulla logica di commit e git flow
 
