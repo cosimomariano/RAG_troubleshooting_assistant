@@ -2,6 +2,7 @@
 
 from app.retrieval.base import Retriever
 from app.retrieval.dense import DenseRetriever
+from app.retrieval.fusion import ReciprocalRankFusion
 from app.retrieval.no_retrieval import NoRetrievalRetriever
 from app.retrieval.selection import RetrievalMode, RetrieverSelector
 from app.retrieval.sparse import SparseRetriever
@@ -9,6 +10,7 @@ from app.retrieval.sparse import SparseRetriever
 __all__ = [
     "DenseRetriever",
     "NoRetrievalRetriever",
+    "ReciprocalRankFusion",
     "RetrievalMode",
     "Retriever",
     "RetrieverSelector",
