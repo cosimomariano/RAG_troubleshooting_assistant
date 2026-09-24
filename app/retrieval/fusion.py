@@ -1,6 +1,17 @@
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import Protocol, runtime_checkable
 from app.models import DocumentChunk, RetrievalContribution, RetrievalResult
+
+
+@runtime_checkable
+class RankFusion(Protocol):
+    #Contratto per la combinazione di piu graduatore (dense + sparse)
+
+    def fuse(
+        self,
+        rankings: Sequence[Sequence[RetrievalResult]],
+    ) -> list[RetrievalResult]: ...
 
 @dataclass
 class _FusedCandidate:
