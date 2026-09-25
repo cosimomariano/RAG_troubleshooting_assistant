@@ -52,5 +52,12 @@ retrieval:
   mode: ${RETRIEVAL_MODE}
   top_k: ${RETRIEVAL_TOP_K}
 
+reranker:
+  enabled: false
+  provider: cross_encoder
+  model: ${RERANKER_MODEL}
+  batch_size: ${RERANKER_BATCH_SIZE}
+  candidate_top_n: ${RERANKER_CANDIDATE_TOP_N}
+
 #generation:
 #incident_analyzer:

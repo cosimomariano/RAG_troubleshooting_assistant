@@ -1,0 +1,9 @@
+experiment:
+  id: hybrid_rerank
+  description: RAG ibrido con fusione RRF e riordinamento tramite Cross-Encoder
+
+retrieval:
+  mode: hybrid
+
+reranker:
+  enabled: true
