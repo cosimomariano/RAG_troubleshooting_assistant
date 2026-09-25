@@ -1,0 +1,6 @@
+experiment:
+  id: hybrid
+  description: RAG ibrido con fusione RRF dei risultati sparse e dense
+
+retrieval:
+  mode: hybrid
