@@ -35,6 +35,7 @@ def test_configuration_exposes_only_components_available_at_this_stage() -> None
         "embeddings",
         "vector_store",
         "retrieval",
+        "reranker",
     }
     assert configuration["application"]["name"] == "rag-troubleshooting-assistant"
     assert configuration["ingestion"]["supported_extensions"] == [".md", ".txt"]
@@ -60,6 +61,13 @@ def test_configuration_exposes_only_components_available_at_this_stage() -> None
     assert configuration["retrieval"] == {
         "mode": "${RETRIEVAL_MODE}",
         "top_k": "${RETRIEVAL_TOP_K}",
+    }
+    assert configuration["reranker"] == {
+        "enabled": False,
+        "provider": "cross_encoder",
+        "model": "${RERANKER_MODEL}",
+        "batch_size": "${RERANKER_BATCH_SIZE}",
+        "candidate_top_n": "${RERANKER_CANDIDATE_TOP_N}",
     }
 
 

@@ -50,6 +50,20 @@ def test_experiment_configuration_changes_only_retrieval_mode(
     assert configuration["retrieval"] == {"mode": expected_mode.value}
 
 
+def test_hybrid_rerank_configuration_enables_the_second_stage() -> None:
+    configuration = load_experiment_configuration("hybrid_rerank.yaml")
+
+    assert configuration == {
+        "experiment": {
+            "id": "hybrid_rerank",
+            "description": (
+                "RAG ibrido con fusione RRF e riordinamento tramite Cross-Encoder"
+            ),
+        },
+        "retrieval": {"mode": RetrievalMode.HYBRID.value},
+        "reranker": {"enabled": True},
+    }
+
 def test_selector_builds_llm_only_baseline_without_retrieval() -> None:
     selector = RetrieverSelector(
         dense_retriever=EmptyRetriever(),

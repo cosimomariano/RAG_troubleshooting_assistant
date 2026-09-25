@@ -1,8 +1,15 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 import pytest
 from app.models import DocumentChunk, RetrievalResult, SourceMetadata
 from app.reranking import Reranker, RerankingRetriever
 from app.retrieval import Retriever
+
+class SequenceClock:
+    def __init__(self, values: Sequence[float]) -> None:
+        self._values = iter(values)
+
+    def __call__(self) -> float:
+        return next(self._values)
 
 class RecordingRetriever:
     def __init__(self, results: list[RetrievalResult]) -> None:
@@ -65,7 +72,9 @@ def build_result(chunk_id: str, rank: int) -> RetrievalResult:
         fused_score=1.0 / (60 + rank),
     )
 
-def build_pipeline() -> tuple[RerankingRetriever, RecordingRetriever, RecordingReranker]:
+def build_pipeline(
+    clock: Callable[[], float] | None = None,
+) -> tuple[RerankingRetriever, RecordingRetriever, RecordingReranker]:
     candidate_retriever = RecordingRetriever(
         [
             build_result("checkout", rank=1),
@@ -74,11 +83,19 @@ def build_pipeline() -> tuple[RerankingRetriever, RecordingRetriever, RecordingR
         ]
     )
     reranker = RecordingReranker()
-    pipeline = RerankingRetriever(
-        candidate_retriever=candidate_retriever,
-        reranker=reranker,
-        candidate_top_n=3,
-    )
+    if clock is None:
+        pipeline = RerankingRetriever(
+            candidate_retriever=candidate_retriever,
+            reranker=reranker,
+            candidate_top_n=3,
+        )
+    else:
+        pipeline = RerankingRetriever(
+            candidate_retriever=candidate_retriever,
+            reranker=reranker,
+            candidate_top_n=3,
+            clock=clock,
+        )
     return pipeline, candidate_retriever, reranker
 
 def test_reranking_pipeline_satisfies_the_common_retriever_contract() -> None:
@@ -109,6 +126,17 @@ def test_reranker_is_not_called_when_retrieval_produces_no_candidates() -> None:
     assert results == []
     assert candidate_retriever.calls == [("errore durante il pagamento", 5)]
     assert reranker.calls == []
+
+
+def test_retrieval_and_reranking_latencies_are_measured_separately() -> None:
+    clock = SequenceClock([10.0, 10.012, 20.0, 20.034])
+    pipeline, _, _ = build_pipeline(clock)
+
+    execution = pipeline.retrieve_with_metrics("errore durante il pagamento", k=2)
+
+    assert [result.chunk.id for result in execution.results] == ["payment", "checkout"]
+    assert execution.retrieval_latency_ms == pytest.approx(12.0)
+    assert execution.reranking_latency_ms == pytest.approx(34.0)
 
 def test_candidate_top_n_must_be_positive() -> None:
     with pytest.raises(ValueError, match="candidate_top_n"):
