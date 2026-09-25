@@ -18,6 +18,7 @@ EXPERIMENT_CONFIGURATIONS = [
     ("llm_only.yaml", RetrievalMode.LLM_ONLY),
     ("dense.yaml", RetrievalMode.DENSE),
     ("sparse.yaml", RetrievalMode.SPARSE),
+    ("hybrid.yaml", RetrievalMode.HYBRID),
 ]
 
 
@@ -35,7 +36,7 @@ def load_experiment_configuration(file_name: str) -> dict:
 
 
 @pytest.mark.parametrize(("file_name", "expected_mode"), EXPERIMENT_CONFIGURATIONS)
-def test_baseline_configuration_changes_only_retrieval_mode(
+def test_experiment_configuration_changes_only_retrieval_mode(
     file_name: str,
     expected_mode: RetrievalMode,
 ) -> None:
@@ -53,6 +54,7 @@ def test_selector_builds_llm_only_baseline_without_retrieval() -> None:
     selector = RetrieverSelector(
         dense_retriever=EmptyRetriever(),
         sparse_retriever=EmptyRetriever(),
+        hybrid_retriever=EmptyRetriever(),
     )
 
     retriever = selector.select(RetrievalMode.LLM_ONLY)

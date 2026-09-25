@@ -82,9 +82,7 @@ def test_hybrid_retriever_combines_sparse_and_dense_rankings() -> None:
     assert [result.rank for result in results] == [1, 2, 3]
     assert {result.retriever for result in results} == {"rrf"}
 
-    checkout_contributions = {
-        contribution.retriever for contribution in results[0].contributions
-    }
+    checkout_contributions = {contribution.retriever for contribution in results[0].contributions}
     assert checkout_contributions == {"sparse", "dense"}
 
 def test_hybrid_retriever_limits_the_final_result_count() -> None:
