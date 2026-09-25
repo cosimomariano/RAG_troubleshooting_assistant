@@ -28,6 +28,10 @@ class RetrievalResult(StrictModel):
         default=None,
         description="Punteggio prodotto dalla fusione di più graduatorie",
     )
+    reranker_score: float | None = Field(
+        default=None,
+        description="Punteggio assegnato dal modello di reranking",
+    )
     contributions: tuple[RetrievalContribution, ...] = Field(
         default=(),
         description="Rank e punteggi originali che hanno contribuito alla fusione",
