@@ -80,6 +80,7 @@ La pipeline è separata in una fase offline di preparazione della conoscenza e u
 |   |   |-- chunking/        # Chunking section-aware
 |   |   |-- loaders/         # Caricamento dei documenti locali
 |   |   |-- masking/         # Mascheramento dei dati sensibili
+|   |-- evaluation/          # Golden case e metriche Recall@K e MRR
 |   |-- models/              # Modelli di dominio
 |   |-- retrieval/           # Retriever Dense, Sparse e Hybrid con fusione RRF
 |   |-- services/            # Orchestrazione del flusso RAG
@@ -90,6 +91,7 @@ La pipeline è separata in una fase offline di preparazione della conoscenza e u
 |   |-- openapi/
 |       |-- troubleshooting-api.yaml
 |-- data/
+|   |-- golden_dataset/      # Casi di troubleshooting per la valutazione
 |   |-- knowledge_base/      # Corpus documentale OpenTelemetry Demo 3.1.0
 |-- tests/                   # Test unitari, contrattuali e di integrazione
 |-- .env.example             # Variabili di ambiente di esempio
@@ -147,7 +149,7 @@ Per eseguire tutti i test:
 ```powershell
 python -m pytest -q
 ```
-La suite attuale comprende **163 casi di test**.
+La suite attuale comprende test automatici per contratti, componenti applicativi e metriche sperimentali.
 
 ## Note sulla logica di commit e git flow
 
