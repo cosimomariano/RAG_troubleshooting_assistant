@@ -151,6 +151,19 @@ python -m pytest -q
 ```
 La suite attuale comprende test automatici per contratti, componenti applicativi e metriche sperimentali.
 
+## Valutazione sperimentale
+
+Il modulo `app/evaluation` carica i golden case e le configurazioni YAML presenti in `configs/experiments`, il runner interroga lo stesso sistema RAG per ogni caso, calcola Recall@K e Mean Reciprocal Rank e conserva anche risposta generata, fonti e latenza.
+Ogni esecuzione viene salvata in una cartella identificata da timestamp e configurazione:
+
+```
+results/<run_id>/
+    |-- config.yaml
+    |-- metrics.json
+    |-- cases.jsonl
+    |-- summary.md
+```
+
 ## Note sulla logica di commit e git flow
 
 Ogni commit è composto in questo modo:
