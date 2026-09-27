@@ -66,6 +66,10 @@ class ExperimentResultWriter:
             f"- Top-K: {metrics.top_k}\n"
             f"- Recall@K medio: {metrics.mean_recall_at_k:.4f}\n"
             f"- Mean Reciprocal Rank: {metrics.mean_reciprocal_rank:.4f}\n"
-            f"- Latenza media: {metrics.mean_latency_ms:.2f} ms\n"
+            f"- Latenza media totale: {metrics.mean_latency_ms:.2f} ms\n"
+            f"- Latenza media retrieval: {metrics.mean_retrieval_latency_ms:.2f} ms\n"
+            f"- Latenza media reranking: {metrics.mean_reranking_latency_ms:.2f} ms\n"
+            f"- Latenza media generazione: {metrics.mean_generation_latency_ms:.2f} ms\n"
+            f"- Token complessivi: {metrics.total_tokens}\n"
         )
         (output_directory / "summary.md").write_text(summary, encoding="utf-8")

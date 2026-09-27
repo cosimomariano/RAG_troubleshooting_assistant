@@ -1,19 +1,13 @@
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 from time import perf_counter
+
 from app.models import RetrievalResult
 from app.reranking.base import Reranker
-from app.retrieval.base import Retriever
+from app.retrieval.base import RetrievalExecution, Retriever
 
 Clock = Callable[[], float]
 
-@dataclass(frozen=True)
-class RerankingExecution:
-    """Risultati e latenze dei due stadi del retrieval con reranking."""
-
-    results: tuple[RetrievalResult, ...]
-    retrieval_latency_ms: float
-    reranking_latency_ms: float
+RerankingExecution = RetrievalExecution
 
 class RerankingRetriever:
     """Applica un secondo stadio di ordinamento ai candidati di un retriever."""

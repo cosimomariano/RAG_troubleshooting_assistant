@@ -7,7 +7,7 @@ from pydantic import Field
 from app.evaluation.cases import GoldenCase
 from app.evaluation.configuration import ExperimentConfiguration
 from app.evaluation.metrics import RetrievalMetricsCalculator
-from app.models import RAGResponse, SourceReference, StrictModel
+from app.models import OperationalMetrics, RAGResponse, SourceReference, StrictModel
 
 TimestampProvider = Callable[[], datetime]
 
@@ -74,6 +74,9 @@ class ExperimentCaseResult(StrictModel):
         ge=0,
         description="Latenza complessiva del caso in millisecondi",
     )
+    operational_metrics: OperationalMetrics = Field(
+        description="Metriche operative raccolte durante il caso",
+    )
 
 
 class ExperimentMetrics(StrictModel):
@@ -93,6 +96,29 @@ class ExperimentMetrics(StrictModel):
         ge=0,
         description="Latenza media complessiva in millisecondi",
     )
+    mean_retrieval_latency_ms: float = Field(
+        ge=0,
+        description="Latenza media del retrieval in millisecondi",
+    )
+    mean_reranking_latency_ms: float = Field(
+        ge=0,
+        description="Latenza media del reranking in millisecondi",
+    )
+    mean_prompt_build_latency_ms: float = Field(
+        ge=0,
+        description="Latenza media della costruzione del prompt in millisecondi",
+    )
+    mean_generation_latency_ms: float = Field(
+        ge=0,
+        description="Latenza media della generazione in millisecondi",
+    )
+    token_usage_case_count: int = Field(
+        ge=0,
+        description="Numero di casi per i quali il provider ha comunicato i token",
+    )
+    total_input_tokens: int = Field(ge=0, description="Token di input complessivi")
+    total_output_tokens: int = Field(ge=0, description="Token di output complessivi")
+    total_tokens: int = Field(ge=0, description="Token complessivi dell'esperimento")
 
 
 class ExperimentRun(StrictModel):
@@ -172,6 +198,7 @@ class ExperimentRunner:
                 case.relevant_documents,
             ),
             latency_ms=response.latency_ms,
+            operational_metrics=response.operational_metrics,
         )
 
     def _calculate_metrics(
@@ -184,6 +211,39 @@ class ExperimentRunner:
             sum(result.reciprocal_rank for result in case_results) / case_count
         )
         mean_latency_ms = sum(result.latency_ms for result in case_results) / case_count
+        mean_retrieval_latency_ms = (
+            sum(
+                result.operational_metrics.retrieval_latency_ms
+                for result in case_results
+            )
+            / case_count
+        )
+        mean_reranking_latency_ms = (
+            sum(
+                result.operational_metrics.reranking_latency_ms
+                for result in case_results
+            )
+            / case_count
+        )
+        mean_prompt_build_latency_ms = (
+            sum(
+                result.operational_metrics.prompt_build_latency_ms
+                for result in case_results
+            )
+            / case_count
+        )
+        mean_generation_latency_ms = (
+            sum(
+                result.operational_metrics.generation_latency_ms
+                for result in case_results
+            )
+            / case_count
+        )
+        token_usages = [
+            result.operational_metrics.token_usage
+            for result in case_results
+            if result.operational_metrics.token_usage is not None
+        ]
 
         return ExperimentMetrics(
             case_count=case_count,
@@ -191,6 +251,14 @@ class ExperimentRunner:
             mean_recall_at_k=mean_recall,
             mean_reciprocal_rank=mean_reciprocal_rank,
             mean_latency_ms=mean_latency_ms,
+            mean_retrieval_latency_ms=mean_retrieval_latency_ms,
+            mean_reranking_latency_ms=mean_reranking_latency_ms,
+            mean_prompt_build_latency_ms=mean_prompt_build_latency_ms,
+            mean_generation_latency_ms=mean_generation_latency_ms,
+            token_usage_case_count=len(token_usages),
+            total_input_tokens=sum(usage.input_tokens for usage in token_usages),
+            total_output_tokens=sum(usage.output_tokens for usage in token_usages),
+            total_tokens=sum(usage.total_tokens for usage in token_usages),
         )
 
     @staticmethod

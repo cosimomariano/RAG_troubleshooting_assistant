@@ -1,6 +1,7 @@
 import httpx
 
 from app.generation.errors import LLMResponseError, LLMServiceUnavailableError
+from app.models import LLMGenerationResult, TokenUsage
 
 OllamaRequestBody = dict[str, object]
 
@@ -22,10 +23,13 @@ class OllamaLLMClient:
         self._http_client = self._resolve_http_client(http_client)
 
     def generate(self, prompt: str) -> str:
+        return self.generate_with_metrics(prompt).text
+
+    def generate_with_metrics(self, prompt: str) -> LLMGenerationResult:
         normalized_prompt = self._normalize_prompt(prompt)
         request_body = self._build_request_body(normalized_prompt)
         response = self._send_request(request_body)
-        return self._extract_generated_text(response)
+        return self._extract_generation_result(response)
 
     def _build_request_body(self, prompt: str) -> OllamaRequestBody:
         return {
@@ -55,18 +59,59 @@ class OllamaLLMClient:
             ) from error
         except httpx.HTTPStatusError as error:
             status_code = error.response.status_code
+            if status_code == 429 or status_code >= 500:
+                raise LLMServiceUnavailableError(
+                    "Il servizio Ollama remoto non è temporaneamente disponibile."
+                ) from error
             raise LLMResponseError(
                 f"Il servizio Ollama ha restituito il seguente stato HTTP: {status_code}."
             ) from error
 
     @staticmethod
-    def _extract_generated_text(response: httpx.Response) -> str:
+    def _extract_generation_result(response: httpx.Response) -> LLMGenerationResult:
         response_body = OllamaLLMClient._read_response_body(response)
         generated_text = response_body.get("response")
 
         if not isinstance(generated_text, str) or not generated_text.strip():
             raise LLMResponseError("La risposta di Ollama non contiene il testo generato.")
-        return generated_text.strip()
+        return LLMGenerationResult(
+            text=generated_text,
+            token_usage=OllamaLLMClient._extract_token_usage(response_body),
+        )
+
+    @staticmethod
+    def _extract_token_usage(response_body: dict[str, object]) -> TokenUsage | None:
+        input_tokens = response_body.get("prompt_eval_count")
+        output_tokens = response_body.get("eval_count")
+
+        if input_tokens is None and output_tokens is None:
+            return None
+        if input_tokens is None or output_tokens is None:
+            raise LLMResponseError(
+                "La risposta di Ollama contiene un conteggio token incompleto."
+            )
+
+        validated_input_tokens = OllamaLLMClient._validate_token_count(
+            input_tokens,
+            "prompt_eval_count",
+        )
+        validated_output_tokens = OllamaLLMClient._validate_token_count(
+            output_tokens,
+            "eval_count",
+        )
+        return TokenUsage(
+            input_tokens=validated_input_tokens,
+            output_tokens=validated_output_tokens,
+            total_tokens=validated_input_tokens + validated_output_tokens,
+        )
+
+    @staticmethod
+    def _validate_token_count(value: object, field_name: str) -> int:
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise LLMResponseError(
+                f"Il campo {field_name} restituito da Ollama non è valido."
+            )
+        return value
 
     @staticmethod
     def _read_response_body(response: httpx.Response) -> dict[str, object]:
