@@ -18,6 +18,7 @@ llm:
 
 ingestion:
   knowledge_base_path: ${KNOWLEDGE_BASE_PATH}
+  knowledge_base_version: ${KNOWLEDGE_BASE_VERSION}
   supported_extensions:
     - .md
     - .txt
@@ -53,11 +54,15 @@ retrieval:
   top_k: ${RETRIEVAL_TOP_K}
 
 reranker:
-  enabled: false
+  enabled: ${RERANKER_ENABLED}
   provider: cross_encoder
   model: ${RERANKER_MODEL}
   batch_size: ${RERANKER_BATCH_SIZE}
   candidate_top_n: ${RERANKER_CANDIDATE_TOP_N}
+
+evaluation:
+  dataset_path: ${GOLDEN_DATASET_PATH}
+  results_path: ${EXPERIMENT_RESULTS_PATH}
 
 #generation:
 #incident_analyzer:

@@ -14,3 +14,5 @@ htmlcov/
 .vscode/
 .DS_Store
 Thumbs.db
+data/vector_store/
+results/

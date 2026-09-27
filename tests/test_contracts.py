@@ -36,9 +36,13 @@ def test_configuration_exposes_only_components_available_at_this_stage() -> None
         "vector_store",
         "retrieval",
         "reranker",
+        "evaluation",
     }
     assert configuration["application"]["name"] == "rag-troubleshooting-assistant"
     assert configuration["ingestion"]["supported_extensions"] == [".md", ".txt"]
+    assert configuration["ingestion"]["knowledge_base_version"] == (
+        "${KNOWLEDGE_BASE_VERSION}"
+    )
     assert (
         configuration["chunking"]["chunk_overlap_characters"]
         < configuration["chunking"]["chunk_size_characters"]
@@ -63,11 +67,15 @@ def test_configuration_exposes_only_components_available_at_this_stage() -> None
         "top_k": "${RETRIEVAL_TOP_K}",
     }
     assert configuration["reranker"] == {
-        "enabled": False,
+        "enabled": "${RERANKER_ENABLED}",
         "provider": "cross_encoder",
         "model": "${RERANKER_MODEL}",
         "batch_size": "${RERANKER_BATCH_SIZE}",
         "candidate_top_n": "${RERANKER_CANDIDATE_TOP_N}",
+    }
+    assert configuration["evaluation"] == {
+        "dataset_path": "${GOLDEN_DATASET_PATH}",
+        "results_path": "${EXPERIMENT_RESULTS_PATH}",
     }
 
 

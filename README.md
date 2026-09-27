@@ -71,6 +71,9 @@ La pipeline è separata in una fase offline di preparazione della conoscenza e u
 ```
 |-- app/
 |   |-- api/                 # Schemi REST, normalizzazione del contesto e factory FastAPI
+|   |-- bootstrap/           # Assemblaggio esplicito della pipeline offline e online
+|   |-- cli/                 # Comandi per indicizzazione ed esperimenti
+|   |-- config/              # Caricamento e validazione della configurazione
 |   |-- generation/          # Prompt builder, interfaccia LLM e client Ollama
 |   |-- indexing/
 |   |   |-- embeddings/      # Astrazione e implementazione Sentence Transformers
@@ -84,6 +87,7 @@ La pipeline è separata in una fase offline di preparazione della conoscenza e u
 |   |-- models/              # Modelli di dominio
 |   |-- retrieval/           # Retriever Dense, Sparse e Hybrid con fusione RRF
 |   |-- services/            # Orchestrazione del flusso RAG
+|   |-- main.py              # Entry point del server FastAPI
 |-- configs/
 |   |-- application.yaml     # Configurazione applicativa progressiva
 |   |-- experiments/         # Configurazioni LLM-only, Dense, Sparse, Hybrid e Hybrid con reranking
@@ -114,12 +118,16 @@ Occorre poi valorizzare almeno:
 - `OLLAMA_MODEL`, con il nome del modello disponibile sul server remoto;
 - `EMBEDDING_MODEL`, con il modello Sentence Transformers scelto;
 - `KNOWLEDGE_BASE_PATH`, con il percorso della Knowledge Base;
+- `KNOWLEDGE_BASE_VERSION`, con la versione logica del corpus usato;
 - `VECTOR_STORE_PATH`, con il percorso in cui salvare l'indice FAISS;
 - `RETRIEVAL_MODE`, con una modalità tra `llm_only`, `dense`, `sparse` e `hybrid`;
 - `RETRIEVAL_TOP_K`, con il numero massimo di risultati da recuperare;
 - `RERANKER_MODEL`, con il modello Cross-Encoder utilizzato per il secondo stadio;
+- `RERANKER_ENABLED`, per abilitare il reranking nell'esecuzione dell'API;
 - `RERANKER_BATCH_SIZE`, con il numero di coppie query-chunk valutate per batch;
-- `RERANKER_CANDIDATE_TOP_N`, con il numero di candidati RRF inviati al Cross-Encoder.
+- `RERANKER_CANDIDATE_TOP_N`, con il numero di candidati RRF inviati al Cross-Encoder;
+- `GOLDEN_DATASET_PATH`, con il percorso del dataset sperimentale;
+- `EXPERIMENT_RESULTS_PATH`, con la directory in cui salvare i risultati.
 
 ## Installazione dell'ambiente
 
@@ -133,7 +141,123 @@ python -m pip install -e ".[dev]"
 ```
 
 ## Come eseguire il progetto
-#TODO COSIMO in corso
+
+L'esecuzione completa è composta da una fase offline, da eseguire quando cambia la Knowledge Base o il modello di embedding, e da una fase online che espone l'API REST.
+
+### 1. Preparazione della configurazione
+
+Creare il file locale `.env` e sostituire tutti i segnaposto racchiusi tra parentesi angolari:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Per una prima esecuzione è possibile usare, a titolo di esempio, un modello Sentence Transformers compatibile con la generazione di embedding normalizzati. Il nome configurato in `EMBEDDING_MODEL` deve rimanere invariato tra costruzione dell'indice e avvio dell'API.
+
+Il file `.env` non viene versionato. Le variabili già definite nel processo hanno precedenza sui valori letti dal file, così una pipeline automatizzata può sostituire la configurazione locale senza modificare il repository.
+
+### 2. Configurazione del server Ollama remoto
+
+Il computer che esegue Ollama deve soltanto ospitare il modello generativo: non deve contenere una copia di questo repository né della Knowledge Base. L'indicizzazione, il retrieval e la costruzione del prompt vengono eseguiti sul computer RAG; a Ollama viene inviato via HTTP soltanto il prompt già composto.
+
+Sul computer Ollama:
+
+1. scaricare il modello scelto con `ollama pull <OLLAMA_MODEL_NAME>`;
+2. configurare `OLLAMA_HOST=0.0.0.0:11434` e riavviare Ollama;
+3. consentire la porta `11434` nel firewall esclusivamente per la rete privata necessaria.
+
+Sul computer RAG impostare in `.env`:
+
+```text
+OLLAMA_BASE_URL=http://<IP_PRIVATO_PC_OLLAMA>:11434
+OLLAMA_MODEL=<OLLAMA_MODEL_NAME>
+```
+
+Verificare la raggiungibilità prima di avviare l'applicazione:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://<IP_PRIVATO_PC_OLLAMA>:11434/api/tags"
+```
+
+Le modalità di esposizione del servizio sono descritte nella [FAQ ufficiale di Ollama](https://docs.ollama.com/faq#how-can-i-expose-ollama-on-my-network).
+
+### 3. Costruzione dell'indice denso
+
+Eseguire il job offline dalla radice del repository:
+
+```powershell
+python -m app.cli.index_knowledge_base
+```
+
+Il comando:
+
+1. carica i documenti Markdown e testuali;
+2. maschera i dati sensibili censiti;
+3. applica il chunking section-aware;
+4. calcola gli embedding in batch;
+5. salva l'indice FAISS e la mappatura dei chunk in `VECTOR_STORE_PATH`.
+
+Al primo utilizzo Sentence Transformers può dover scaricare il modello configurato. L'indice deve essere ricostruito quando cambiano la Knowledge Base, i parametri di chunking o il modello di embedding.
+
+### 4. Avvio dell'API
+
+Selezionare in `.env` una modalità tra `llm_only`, `sparse`, `dense` e `hybrid`, quindi avviare il server:
+
+```powershell
+python -m app.main
+```
+
+Host e porta sono letti da `SERVER_HOST` e `SERVER_PORT`. Con i valori di esempio la documentazione interattiva è disponibile all'indirizzo `http://localhost:8000/docs`.
+
+Esempio di richiesta da una seconda console PowerShell:
+
+```powershell
+    $body = @{
+        question = "Perché il checkout non completa il pagamento?"
+        incident_context = "La chiamata payment/charge restituisce connection refused."
+        service = "checkout"
+    } | ConvertTo-Json
+
+    Invoke-RestMethod `
+        -Method Post `
+        -Uri "http://localhost:8000/troubleshoot" `
+        -ContentType "application/json" `
+        -Body $body
+```
+
+Le modalità `dense` e `hybrid` richiedono un indice FAISS già costruito. `sparse` costruisce BM25 in memoria a partire dalla Knowledge Base, mentre `llm_only` non esegue retrieval. Impostando `RERANKER_ENABLED=true`, il retriever selezionato viene seguito dal Cross-Encoder configurato; per il confronto sperimentale previsto il reranking viene applicato alla modalità ibrida.
+
+## Architettura eseguibile
+
+```mermaid
+flowchart LR
+    subgraph Offline[Pipeline offline]
+        KB[Knowledge Base] --> LOAD[Caricamento]
+        LOAD --> MASK[Masking]
+        MASK --> CHUNK[Chunking section-aware]
+        CHUNK --> EMB[Bi-Encoder]
+        EMB --> FAISS[(Indice FAISS)]
+    end
+
+    subgraph Online[Pipeline online]
+        REQ[Domanda e telemetria normalizzata] --> RET{Modalità di retrieval}
+        RET -->|llm_only| EMPTY[Nessuna fonte]
+        RET -->|sparse| BM25[BM25]
+        RET -->|dense| DENSE[Dense Retriever]
+        RET -->|hybrid| HYBRID[BM25 + Dense + RRF]
+        FAISS --> DENSE
+        FAISS --> HYBRID
+        BM25 --> RERANK[Cross-Encoder opzionale]
+        DENSE --> RERANK
+        HYBRID --> RERANK
+        RERANK --> PROMPT[Prompt Builder]
+        EMPTY --> PROMPT
+        PROMPT --> OLLAMA[Ollama remoto]
+        OLLAMA --> RESP[Risposta, fonti e metriche]
+    end
+```
+
+Lo schema completo modificabile è disponibile nella cartella [`architecture_schema`](architecture_schema).
 
 ## Output del sistema
 
@@ -163,6 +287,50 @@ results/<run_id>/
     |-- cases.jsonl
     |-- summary.md
 ```
+
+Prima degli esperimenti Dense, Hybrid e Hybrid con reranking deve essere disponibile l'indice costruito con il comando di indicizzazione. Ollama deve essere raggiungibile per tutte le configurazioni, compreso il baseline LLM-only.
+
+Per eseguire una singola configurazione:
+
+```powershell
+python -m app.cli.run_experiment --experiment-config configs/experiments/dense.yaml
+```
+
+Per eseguire l'intero confronto, lanciare in sequenza:
+
+```powershell
+python -m app.cli.run_experiment --experiment-config configs/experiments/llm_only.yaml
+python -m app.cli.run_experiment --experiment-config configs/experiments/sparse.yaml
+python -m app.cli.run_experiment --experiment-config configs/experiments/dense.yaml
+python -m app.cli.run_experiment --experiment-config configs/experiments/hybrid.yaml
+python -m app.cli.run_experiment --experiment-config configs/experiments/hybrid_rerank.yaml
+```
+
+Ogni esecuzione usa lo stesso golden dataset, prompt builder e generatore, registra il commit Git e gli identificativi dei modelli e salva output per caso, Recall@K, MRR, latenze e token comunicati da Ollama. Le cartelle generate in `results` sono escluse da Git e vanno conservate come artefatti sperimentali quando utilizzate nella tesi.
+
+## Limitazioni note
+
+- La Knowledge Base è curata e circoscritta ai servizi selezionati di OpenTelemetry Demo 3.1.0.
+- Le telemetrie runtime devono essere raccolte e normalizzate prima della chiamata API; non è ancora presente un connettore diretto verso un OTel Collector.
+- FAISS usa un indice locale esatto e non offre le funzioni operative di un database vettoriale distribuito.
+- BM25 viene ricostruito in memoria all'avvio della relativa modalità e l'indicizzazione densa non è incrementale.
+- I modelli Sentence Transformers vengono eseguiti sul computer RAG e possono richiedere il download iniziale dei pesi.
+- Il prototipo dipende dalla raggiungibilità del server Ollama e non include autenticazione, TLS o retry di livello produttivo.
+- Il runner calcola metriche di retrieval e operative; la valutazione completa di correttezza e faithfulness richiede ancora annotazione umana o un valutatore esplicitamente validato.
+- Query rewriting, HyDE, context compression e faithfulness checker automatico restano estensioni successive al core sperimentale.
+- L'Incident Analyzer LSTM/GRU non è implementato: il core funziona senza classificatore e la componente rimane fuori dal flusso eseguibile.
+
+## Prossimi passi
+
+Il passo successivo al consolidamento del prototipo consiste nel raccogliere evidenze riproducibili per i casi del golden dataset, eseguire tutte le configurazioni sullo stesso ambiente e analizzare congiuntamente qualità del retrieval, qualità delle risposte e costo operativo. Soltanto dopo la stabilizzazione delle baseline potranno essere valutate singolarmente le estensioni Advanced RAG rimandate.
+
+## Documentazione tecnica di riferimento
+
+- [Ollama API](https://docs.ollama.com/api/introduction)
+- [Configurazione del server Ollama](https://docs.ollama.com/faq#how-do-i-configure-ollama-server)
+- [Sentence Transformers Quickstart](https://www.sbert.net/docs/quickstart.html)
+- [FAISS](https://github.com/facebookresearch/faiss)
+- [Uvicorn settings](https://www.uvicorn.org/settings/)
 
 ## Note sulla logica di commit e git flow
 
