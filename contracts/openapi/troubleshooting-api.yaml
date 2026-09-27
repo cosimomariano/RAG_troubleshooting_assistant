@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Contratto API dell'assistente RAG per il troubleshooting
-  version: 0.2.0
+  version: 0.3.0
   description: >
     Contratto API per un assistente Retrieval-Augmented Generation (RAG) dedicato al troubleshooting di applicazioni backend a microservizi.
     Il sistema riceve una domanda tecnica, un eventuale contesto dell'incidente ed eventuali evidenze di telemetria normalizzate. Recupera quindi informazioni pertinenti dalla Knowledge Base e genera una risposta corredata dalle fonti tecniche utilizzate.
@@ -64,10 +64,19 @@ paths:
                       Le evidenze indicano che il servizio checkout non riesce a raggiungere il servizio payment.
                        Verificare la disponibilità del servizio e la configurazione dell'endpoint utilizzato.
                     sources:
-                      - source: payment-unreachable.md
+                      - citation_id: FONTE_1
+                        document_id: document-payment-unreachable
+                        source: payment-unreachable.md
                         chunk_id: payment-unreachable-0001
+                        document_type: runbook
                         section: Possible causes
                         service: payment
+                        category: service-unavailable
+                        rank: 1
+                        retriever: rrf
+                        score: null
+                        fused_score: 0.0328
+                        reranker_score: 4.82
                     latency_ms: 842
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -326,12 +335,31 @@ components:
       type: object
       additionalProperties: false
       required:
+        - citation_id
+        - document_id
         - source
         - chunk_id
+        - document_type
+        - rank
+        - retriever
       description: >
         Riferimento alla porzione della Knowledge Base utilizzata durante la
         generazione della risposta.
       properties:
+        citation_id:
+          type: string
+          pattern: '^FONTE_[1-9][0-9]*$'
+          description: |
+            Identificativo fornito al modello e restituito al client per citare questa fonte.
+          examples:
+            - FONTE_1
+        document_id:
+          type: string
+          minLength: 1
+          description: |
+            Identificativo stabile del documento nella Knowledge Base.
+          examples:
+            - document-payment-unreachable
         source:
           type: string
           minLength: 1
@@ -346,6 +374,13 @@ components:
             Identificativo stabile del chunk recuperato.
           examples:
             - payment-unreachable-0001
+        document_type:
+          type: string
+          minLength: 1
+          description: |
+            Tipologia del documento dal quale proviene il chunk.
+          examples:
+            - runbook
         section:
           type:
             - string
@@ -364,6 +399,48 @@ components:
             Microservizio associato alla fonte, se disponibile.
           examples:
             - payment
+        category:
+          type:
+            - string
+            - 'null'
+          default: null
+          description: |
+            Categoria documentale associata alla fonte, se disponibile.
+          examples:
+            - service-unavailable
+        rank:
+          type: integer
+          minimum: 1
+          description: |
+            Posizione della fonte nella graduatoria finale utilizzata dal prompt.
+        retriever:
+          type: string
+          minLength: 1
+          description: |
+            Componente che ha prodotto la graduatoria finale.
+          examples:
+            - rrf
+        score:
+          type:
+            - number
+            - 'null'
+          default: null
+          description: |
+            Punteggio originale assegnato dal retriever, se disponibile.
+        fused_score:
+          type:
+            - number
+            - 'null'
+          default: null
+          description: |
+            Punteggio assegnato dalla fusione delle graduatorie, se disponibile.
+        reranker_score:
+          type:
+            - number
+            - 'null'
+          default: null
+          description: |
+            Punteggio assegnato dal secondo stadio di reranking, se disponibile.
     ErrorResponse:
       type: object
       description: |
