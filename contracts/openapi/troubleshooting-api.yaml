@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Contratto API dell'assistente RAG per il troubleshooting
-  version: 0.3.0
+  version: 0.4.0
   description: >
     Contratto API per un assistente Retrieval-Augmented Generation (RAG) dedicato al troubleshooting di applicazioni backend a microservizi.
     Il sistema riceve una domanda tecnica, un eventuale contesto dell'incidente ed eventuali evidenze di telemetria normalizzate. Recupera quindi informazioni pertinenti dalla Knowledge Base e genera una risposta corredata dalle fonti tecniche utilizzate.
@@ -78,12 +78,24 @@ paths:
                         fused_score: 0.0328
                         reranker_score: 4.82
                     latency_ms: 842
+                    operational_metrics:
+                      retrieval_latency_ms: 74
+                      reranking_latency_ms: 31
+                      prompt_build_latency_ms: 2
+                      generation_latency_ms: 721
+                      total_latency_ms: 842
+                      token_usage:
+                        input_tokens: 615
+                        output_tokens: 126
+                        total_tokens: 741
         '400':
           $ref: '#/components/responses/BadRequest'
         '422':
           $ref: '#/components/responses/ValidationError'
         '500':
           $ref: '#/components/responses/InternalServerError'
+        '502':
+          $ref: '#/components/responses/BadGateway'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 components:
@@ -308,6 +320,7 @@ components:
         - answer
         - sources
         - latency_ms
+        - operational_metrics
       properties:
         answer:
           type: string
@@ -330,7 +343,85 @@ components:
           minimum: 0
           description: >
             Tempo totale di elaborazione della richiesta espresso in
-            millisecondi.
+            millisecondi. Il valore coincide con total_latency_ms.
+        operational_metrics:
+          $ref: '#/components/schemas/OperationalMetrics'
+          description: |
+            Dettaglio delle latenze dei singoli stadi e dell'utilizzo dei token.
+    OperationalMetrics:
+      type: object
+      additionalProperties: false
+      required:
+        - retrieval_latency_ms
+        - reranking_latency_ms
+        - prompt_build_latency_ms
+        - generation_latency_ms
+        - total_latency_ms
+      description: |
+        Metriche operative raccolte durante l'elaborazione della richiesta.
+      properties:
+        retrieval_latency_ms:
+          type: number
+          format: double
+          minimum: 0
+          description: |
+            Tempo impiegato dal recupero documentale, espresso in millisecondi.
+        reranking_latency_ms:
+          type: number
+          format: double
+          minimum: 0
+          description: |
+            Tempo impiegato dal secondo stadio di reranking, espresso in millisecondi.
+        prompt_build_latency_ms:
+          type: number
+          format: double
+          minimum: 0
+          description: |
+            Tempo impiegato per costruire il prompt, espresso in millisecondi.
+        generation_latency_ms:
+          type: number
+          format: double
+          minimum: 0
+          description: |
+            Tempo impiegato dal modello generativo, espresso in millisecondi.
+        total_latency_ms:
+          type: number
+          format: double
+          minimum: 0
+          description: |
+            Tempo complessivo di elaborazione, espresso in millisecondi.
+        token_usage:
+          anyOf:
+            - $ref: '#/components/schemas/TokenUsage'
+            - type: 'null'
+          default: null
+          description: |
+            Conteggio dei token comunicato dal provider LLM, se disponibile.
+    TokenUsage:
+      type: object
+      additionalProperties: false
+      required:
+        - input_tokens
+        - output_tokens
+        - total_tokens
+      description: |
+        Numero di token elaborati e generati dal modello LLM.
+      properties:
+        input_tokens:
+          type: integer
+          minimum: 0
+          description: |
+            Token elaborati nel prompt.
+        output_tokens:
+          type: integer
+          minimum: 0
+          description: |
+            Token prodotti nella risposta.
+        total_tokens:
+          type: integer
+          minimum: 0
+          description: |
+            Somma dei token di input e di output.
     SourceReference:
       type: object
       additionalProperties: false
@@ -497,6 +588,16 @@ components:
           example:
             code: INTERNAL_ERROR
             message: Errore interno durante l'elaborazione della richiesta.
+    BadGateway:
+      description: |
+        Il servizio LLM remoto ha restituito una risposta non valida.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: LLM_INVALID_RESPONSE
+            message: Il servizio LLM remoto ha restituito una risposta non valida.
     ServiceUnavailable:
       description: >
         Una dipendenza necessaria al completamento della richiesta non è

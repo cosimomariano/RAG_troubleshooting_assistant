@@ -1,6 +1,7 @@
-from pydantic import Field
-
+from math import isclose
+from pydantic import Field, model_validator
 from app.models.base import StrictModel
+from app.models.observability import OperationalMetrics
 
 
 class SourceReference(StrictModel):
@@ -46,3 +47,17 @@ class RAGResponse(StrictModel):
     answer: str = Field(min_length=1, description="Risposta generata dal sistema")
     sources: list[SourceReference] = Field(description="Fonti usate nella risposta")
     latency_ms: float = Field(ge=0, description="Latenza totale in millisecondi")
+    operational_metrics: OperationalMetrics = Field(
+        description="Dettaglio delle metriche operative della richiesta"
+    )
+
+    @model_validator(mode="after")
+    def validate_total_latency(self) -> "RAGResponse":
+        if not isclose(
+            self.latency_ms,
+            self.operational_metrics.total_latency_ms,
+            rel_tol=1e-9,
+            abs_tol=1e-6,
+        ):
+            raise ValueError("La latenza totale non coincide con le metriche operative.")
+        return self

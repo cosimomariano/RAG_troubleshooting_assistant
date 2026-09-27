@@ -1,10 +1,12 @@
 from typing import Protocol, runtime_checkable
+
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+
 from app.api.incident_context import IncidentContextBuilder
 from app.api.schemas import ErrorResponse, TroubleshootingRequest, TroubleshootingResponse
-from app.generation import LLMClientError
+from app.generation import LLMClientError, LLMResponseError
 from app.models import RAGResponse
 
 ERROR_RESPONSES = {
@@ -19,6 +21,10 @@ ERROR_RESPONSES = {
     status.HTTP_500_INTERNAL_SERVER_ERROR: {
         "model": ErrorResponse,
         "description": "Si è verificato un errore interno.",
+    },
+    status.HTTP_502_BAD_GATEWAY: {
+        "model": ErrorResponse,
+        "description": "Il servizio LLM remoto ha restituito una risposta non valida.",
     },
     status.HTTP_503_SERVICE_UNAVAILABLE: {
         "model": ErrorResponse,
@@ -61,7 +67,7 @@ def create_app(rag_service: TroubleshootingService) -> FastAPI:
             "API per analizzare incidenti tecnici in applicazioni backend "
             "a microservizi tramite una pipeline RAG."
         ),
-        version="0.3.0",
+        version="0.4.0",
     )
     controller = TroubleshootingController(rag_service)
 
@@ -97,6 +103,17 @@ def _register_error_handlers(application: FastAPI) -> None:
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             code="VALIDATION_ERROR",
             message="Il corpo della richiesta non rispetta il contratto API previsto.",
+        )
+
+    @application.exception_handler(LLMResponseError)
+    async def llm_response_error_handler(
+        _request: Request,
+        _exception: LLMResponseError,
+    ) -> JSONResponse:
+        return _create_error_response(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            code="LLM_INVALID_RESPONSE",
+            message="Il servizio LLM remoto ha restituito una risposta non valida.",
         )
 
     @application.exception_handler(LLMClientError)

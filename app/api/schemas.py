@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from app.models import RAGResponse, SourceReference, StrictModel
+from app.models import OperationalMetrics, RAGResponse, SourceReference, StrictModel
 
 
 class StrictApiModel(StrictModel):
@@ -124,6 +124,9 @@ class TroubleshootingResponse(StrictApiModel):
     latency_ms: float = Field(
         ge=0,
         description="Tempo totale di elaborazione espresso in millisecondi.",
+    )
+    operational_metrics: OperationalMetrics = Field(
+        description="Dettaglio delle latenze operative e dell'utilizzo dei token.",
     )
 
     @classmethod
