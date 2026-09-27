@@ -1,3 +1,4 @@
+from app.generation.citations import CitationFormatter
 from app.generation.errors import (
     LLMClientError,
     LLMResponseError,
@@ -9,6 +10,7 @@ from app.generation.prompt_builder import PromptBuilder
 from app.generation.stub import StubLLMClient
 
 __all__ = [
+    "CitationFormatter",
     "LLMClient",
     "LLMClientError",
     "LLMResponseError",
