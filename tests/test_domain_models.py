@@ -1,7 +1,15 @@
 import pytest
 from pydantic import ValidationError
 
-from app.models import Document, DocumentChunk, RetrievalResult, SourceMetadata
+from app.models import (
+    Document,
+    DocumentChunk,
+    OperationalMetrics,
+    RAGResponse,
+    RetrievalResult,
+    SourceMetadata,
+    TokenUsage,
+)
 
 
 def payment_runbook_metadata() -> SourceMetadata:
@@ -70,4 +78,29 @@ def test_rank_zero_is_not_a_valid_search_position() -> None:
             chunk=payment_diagnostic_chunk(),
             rank=0,
             retriever="dense",
+        )
+
+
+def test_token_total_must_match_input_and_output_counts() -> None:
+    with pytest.raises(ValidationError, match="totale dei token"):
+        TokenUsage(
+            input_tokens=12,
+            output_tokens=3,
+            total_tokens=14,
+        )
+
+
+def test_response_total_latency_must_match_operational_metrics() -> None:
+    with pytest.raises(ValidationError, match="latenza totale"):
+        RAGResponse(
+            answer="Risposta di prova",
+            sources=[],
+            latency_ms=20.0,
+            operational_metrics=OperationalMetrics(
+                retrieval_latency_ms=2.0,
+                reranking_latency_ms=0.0,
+                prompt_build_latency_ms=1.0,
+                generation_latency_ms=15.0,
+                total_latency_ms=19.0,
+            ),
         )

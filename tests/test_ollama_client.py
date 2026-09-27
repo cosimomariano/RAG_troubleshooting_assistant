@@ -7,6 +7,7 @@ from app.generation import (
     LLMClient,
     LLMResponseError,
     LLMServiceUnavailableError,
+    MeasuredLLMClient,
     OllamaLLMClient,
 )
 
@@ -57,6 +58,32 @@ def test_generate_sends_the_prompt_and_returns_ollama_text() -> None:
     }
 
 
+def test_generate_with_metrics_maps_ollama_token_counts() -> None:
+    def handle_request(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "response": "Verificare il servizio payment.",
+                "done": True,
+                "prompt_eval_count": 42,
+                "eval_count": 11,
+            },
+        )
+
+    ollama_client, http_client = build_client(httpx.MockTransport(handle_request))
+    with http_client:
+        result = ollama_client.generate_with_metrics("Analizza l'incidente.")
+
+    assert isinstance(ollama_client, MeasuredLLMClient)
+    assert result.text == "Verificare il servizio payment."
+    assert result.token_usage is not None
+    assert result.token_usage.model_dump() == {
+        "input_tokens": 42,
+        "output_tokens": 11,
+        "total_tokens": 53,
+    }
+
+
 def test_timeout_is_reported_as_unavailable_service() -> None:
     def handle_request(request: httpx.Request) -> httpx.Response:
         raise httpx.ReadTimeout("Timeout simulato", request=request)
@@ -81,12 +108,21 @@ def test_connection_error_is_reported_as_unavailable_service() -> None:
         ollama_client.generate("Analizza l'incidente.")
 
 
-def test_http_error_preserves_the_remote_status_code() -> None:
+def test_server_http_error_is_reported_as_unavailable_service() -> None:
     def handle_request(request: httpx.Request) -> httpx.Response:
         return httpx.Response(503, json={"error": "model unavailable"})
 
     ollama_client, http_client = build_client(httpx.MockTransport(handle_request))
-    with http_client, pytest.raises(LLMResponseError, match="503"):
+    with http_client, pytest.raises(LLMServiceUnavailableError, match="temporaneamente"):
+        ollama_client.generate("Analizza l'incidente.")
+
+
+def test_client_http_error_preserves_the_remote_status_code() -> None:
+    def handle_request(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": "invalid request"})
+
+    ollama_client, http_client = build_client(httpx.MockTransport(handle_request))
+    with http_client, pytest.raises(LLMResponseError, match="400"):
         ollama_client.generate("Analizza l'incidente.")
 
 
@@ -104,6 +140,27 @@ def test_http_error_preserves_the_remote_status_code() -> None:
         pytest.param(
             httpx.Response(200, json={"response": "   ", "done": True}),
             id="risposta-vuota",
+        ),
+        pytest.param(
+            httpx.Response(
+                200,
+                json={
+                    "response": "Risposta valida",
+                    "prompt_eval_count": 20,
+                },
+            ),
+            id="conteggio-token-incompleto",
+        ),
+        pytest.param(
+            httpx.Response(
+                200,
+                json={
+                    "response": "Risposta valida",
+                    "prompt_eval_count": "venti",
+                    "eval_count": 5,
+                },
+            ),
+            id="conteggio-token-non-numerico",
         ),
     ],
 )

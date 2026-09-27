@@ -64,7 +64,7 @@ La pipeline è separata in una fase offline di preparazione della conoscenza e u
 - **Fusion e reranking**: combinazione tramite RRF e riordinamento opzionale con Cross-Encoder, con misurazione separata delle latenze dei due stadi. Implementato.
 - **Prompt assembly**: unione di istruzioni, domanda, contesto dell'incidente, chunk recuperati e identificativi deterministici delle fonti nel formato `[FONTE_n]`.
 - **Generazione**: invocazione REST di un LLM servito da Ollama su una macchina remota della rete privata.
-- **Risposta**: restituzione di diagnosi, verifiche suggerite, citazioni strutturate e metriche di latenza. Ogni citazione conserva documento, chunk, sezione, rank, retriever e punteggi disponibili.
+- **Risposta**: restituzione di diagnosi, verifiche suggerite, citazioni strutturate e metriche operative. Ogni citazione conserva documento, chunk, sezione, rank, retriever e punteggi disponibili; le metriche distinguono retrieval, reranking, costruzione del prompt, generazione e tempo totale.
 
 ## Struttura del progetto
 
@@ -139,7 +139,7 @@ python -m pip install -e ".[dev]"
 
 Il contratto e l'adapter FastAPI definiscono il seguente endpoint REST:
 
-- **POST `/troubleshoot`**: riceve una domanda, un eventuale servizio interessato e un contesto di incidente composto da testo, log, span e metriche normalizzate; restituisce una risposta grounded, le fonti utilizzate e la latenza complessiva.
+- **POST `/troubleshoot`**: riceve una domanda, un eventuale servizio interessato e un contesto di incidente composto da testo, log, span e metriche normalizzate; restituisce una risposta grounded, le fonti utilizzate, le latenze dei singoli stadi e l'utilizzo dei token comunicato da Ollama quando disponibile.
 
 La specifica completa si trova in [`troubleshooting-api.yaml`](contracts/openapi/troubleshooting-api.yaml).
 

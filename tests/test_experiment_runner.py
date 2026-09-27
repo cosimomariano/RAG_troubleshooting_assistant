@@ -12,7 +12,7 @@ from app.evaluation import (
     ExperimentRunner,
     GoldenCase,
 )
-from app.models import RAGResponse, SourceReference
+from app.models import OperationalMetrics, RAGResponse, SourceReference, TokenUsage
 from app.retrieval import RetrievalMode
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -37,12 +37,31 @@ class DeterministicExperimentSystem:
                     self._source("runbooks/payment-failure.md", "payment-001", rank=2),
                 ],
                 latency_ms=10.0,
+                operational_metrics=OperationalMetrics(
+                    retrieval_latency_ms=2.0,
+                    reranking_latency_ms=1.0,
+                    prompt_build_latency_ms=0.5,
+                    generation_latency_ms=6.5,
+                    total_latency_ms=10.0,
+                    token_usage=TokenUsage(
+                        input_tokens=10,
+                        output_tokens=5,
+                        total_tokens=15,
+                    ),
+                ),
             )
 
         return RAGResponse(
             answer="Le fonti recuperate non permettono di identificare la causa.",
             sources=[self._source("services/checkout-service.md", "checkout-001")],
             latency_ms=20.0,
+            operational_metrics=OperationalMetrics(
+                retrieval_latency_ms=4.0,
+                reranking_latency_ms=0.0,
+                prompt_build_latency_ms=1.0,
+                generation_latency_ms=14.0,
+                total_latency_ms=20.0,
+            ),
         )
 
     @staticmethod
@@ -132,6 +151,14 @@ def test_runner_calculates_aggregate_metrics_for_all_cases() -> None:
     assert experiment_run.metrics.mean_recall_at_k == 0.5
     assert experiment_run.metrics.mean_reciprocal_rank == 0.25
     assert experiment_run.metrics.mean_latency_ms == 15.0
+    assert experiment_run.metrics.mean_retrieval_latency_ms == 3.0
+    assert experiment_run.metrics.mean_reranking_latency_ms == 0.5
+    assert experiment_run.metrics.mean_prompt_build_latency_ms == 0.75
+    assert experiment_run.metrics.mean_generation_latency_ms == 10.25
+    assert experiment_run.metrics.token_usage_case_count == 1
+    assert experiment_run.metrics.total_input_tokens == 10
+    assert experiment_run.metrics.total_output_tokens == 5
+    assert experiment_run.metrics.total_tokens == 15
     assert experiment_run.cases[0].recall_at_k == 1.0
     assert experiment_run.cases[0].reciprocal_rank == 0.5
     assert experiment_run.cases[1].recall_at_k == 0.0

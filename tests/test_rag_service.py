@@ -3,7 +3,8 @@ from collections.abc import Sequence
 import pytest
 
 from app.generation import LLMClient, PromptBuilder, StubLLMClient
-from app.models import DocumentChunk, RetrievalResult, SourceMetadata
+from app.models import DocumentChunk, RetrievalResult, SourceMetadata, TokenUsage
+from app.retrieval import RetrievalExecution
 from app.services import RAGService
 
 
@@ -20,6 +21,24 @@ class RecordingRetriever:
 class EmptyResponseLLM:
     def generate(self, prompt: str) -> str:
         return "   "
+
+
+class SequenceClock:
+    def __init__(self, values: Sequence[float]) -> None:
+        self._values = iter(values)
+
+    def __call__(self) -> float:
+        return next(self._values)
+
+
+class MeasuredRecordingRetriever(RecordingRetriever):
+    def retrieve_with_metrics(self, query: str, k: int) -> RetrievalExecution:
+        self.calls.append((query, k))
+        return RetrievalExecution(
+            results=tuple(self.results[:k]),
+            retrieval_latency_ms=12.0,
+            reranking_latency_ms=34.0,
+        )
 
 
 def build_result() -> RetrievalResult:
@@ -57,12 +76,17 @@ def test_stub_client_satisfies_llm_contract_without_network_calls() -> None:
 
 def test_rag_service_connects_retrieval_prompt_and_generation() -> None:
     retriever = RecordingRetriever([build_result()])
-    llm_client = StubLLMClient("La causa probabile è l'indisponibilità del servizio payment.")
+    llm_client = StubLLMClient(
+        "La causa probabile è l'indisponibilità del servizio payment.",
+        token_usage=TokenUsage(input_tokens=12, output_tokens=3, total_tokens=15),
+    )
+    clock = SequenceClock([10.0, 10.1, 10.3, 10.3, 10.35, 10.35, 10.75, 10.8])
     service = RAGService(
         retriever=retriever,
         prompt_builder=PromptBuilder(),
         llm_client=llm_client,
         top_k=3,
+        clock=clock,
     )
 
     response = service.troubleshoot(
@@ -80,7 +104,16 @@ def test_rag_service_connects_retrieval_prompt_and_generation() -> None:
     assert len(llm_client.received_prompts) == 1
     assert "[FONTE_1]" in llm_client.received_prompts[0]
     assert response.answer == ("La causa probabile è l'indisponibilità del servizio payment.")
-    assert response.latency_ms >= 0
+    assert response.latency_ms == pytest.approx(800.0)
+    assert response.operational_metrics.retrieval_latency_ms == pytest.approx(200.0)
+    assert response.operational_metrics.reranking_latency_ms == 0.0
+    assert response.operational_metrics.prompt_build_latency_ms == pytest.approx(50.0)
+    assert response.operational_metrics.generation_latency_ms == pytest.approx(400.0)
+    assert response.operational_metrics.token_usage == TokenUsage(
+        input_tokens=12,
+        output_tokens=3,
+        total_tokens=15,
+    )
     assert response.sources[0].model_dump() == {
         "citation_id": "FONTE_1",
         "document_id": "runbook-payment",
@@ -113,6 +146,26 @@ def test_question_is_used_alone_when_incident_context_is_missing() -> None:
     assert retriever.calls == [("Qual è la causa dell'errore?", 5)]
     assert response.sources == []
     assert "Nessuna fonte documentale è stata recuperata." in llm_client.received_prompts[0]
+
+
+def test_reranking_latency_is_propagated_from_a_measured_retriever() -> None:
+    retriever = MeasuredRecordingRetriever([build_result()])
+    clock = SequenceClock([20.0, 20.1, 20.12, 20.12, 20.4, 20.45])
+    service = RAGService(
+        retriever=retriever,
+        prompt_builder=PromptBuilder(),
+        llm_client=StubLLMClient("Risposta di prova."),
+        top_k=1,
+        clock=clock,
+    )
+
+    response = service.troubleshoot("Perché il pagamento fallisce?")
+
+    assert response.operational_metrics.retrieval_latency_ms == 12.0
+    assert response.operational_metrics.reranking_latency_ms == 34.0
+    assert response.operational_metrics.prompt_build_latency_ms == pytest.approx(20.0)
+    assert response.operational_metrics.generation_latency_ms == pytest.approx(280.0)
+    assert response.operational_metrics.total_latency_ms == pytest.approx(450.0)
 
 
 @pytest.mark.parametrize("top_k", [0, -1])

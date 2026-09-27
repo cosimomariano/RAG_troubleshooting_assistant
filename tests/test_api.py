@@ -5,8 +5,8 @@ import yaml
 from fastapi.testclient import TestClient
 
 from app.api import TroubleshootingService, create_app
-from app.generation import LLMServiceUnavailableError
-from app.models import RAGResponse, SourceReference
+from app.generation import LLMResponseError, LLMServiceUnavailableError
+from app.models import OperationalMetrics, RAGResponse, SourceReference, TokenUsage
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -42,6 +42,18 @@ class RecordingTroubleshootingService:
                 )
             ],
             latency_ms=18.5,
+            operational_metrics=OperationalMetrics(
+                retrieval_latency_ms=3.0,
+                reranking_latency_ms=1.5,
+                prompt_build_latency_ms=0.5,
+                generation_latency_ms=12.0,
+                total_latency_ms=18.5,
+                token_usage=TokenUsage(
+                    input_tokens=120,
+                    output_tokens=30,
+                    total_tokens=150,
+                ),
+            ),
         )
 
 
@@ -120,6 +132,18 @@ def test_api_accepts_normalized_telemetry_and_returns_sources() -> None:
             }
         ],
         "latency_ms": 18.5,
+        "operational_metrics": {
+            "retrieval_latency_ms": 3.0,
+            "reranking_latency_ms": 1.5,
+            "prompt_build_latency_ms": 0.5,
+            "generation_latency_ms": 12.0,
+            "total_latency_ms": 18.5,
+            "token_usage": {
+                "input_tokens": 120,
+                "output_tokens": 30,
+                "total_tokens": 150,
+            },
+        },
     }
 
     question, incident_context = service.calls[0]
@@ -192,6 +216,15 @@ def test_invalid_body_returns_the_contract_error(body: dict[str, object]) -> Non
             id="richiesta-non-valida",
         ),
         pytest.param(
+            LLMResponseError("Risposta remota non valida"),
+            502,
+            {
+                "code": "LLM_INVALID_RESPONSE",
+                "message": "Il servizio LLM remoto ha restituito una risposta non valida.",
+            },
+            id="risposta-llm-non-valida",
+        ),
+        pytest.param(
             LLMServiceUnavailableError("Timeout simulato"),
             503,
             {
@@ -250,6 +283,8 @@ def test_generated_openapi_matches_the_public_contract_fields() -> None:
         "SpanEvidence",
         "MetricEvidence",
         "TroubleshootingResponse",
+        "OperationalMetrics",
+        "TokenUsage",
         "SourceReference",
         "ErrorResponse",
     ]:

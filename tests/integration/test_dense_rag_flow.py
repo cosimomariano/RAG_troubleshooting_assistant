@@ -81,6 +81,8 @@ def test_dense_rag_request_reaches_mocked_ollama_with_retrieved_evidence(
                     "payment non è raggiungibile."
                 ),
                 "done": True,
+                "prompt_eval_count": 84,
+                "eval_count": 19,
             },
         )
 
@@ -117,6 +119,16 @@ def test_dense_rag_request_reaches_mocked_ollama_with_retrieved_evidence(
         "Il checkout non completa il pagamento perché il servizio payment non è raggiungibile."
     )
     assert response_body["latency_ms"] >= 0
+    assert response_body["operational_metrics"]["retrieval_latency_ms"] >= 0
+    assert response_body["operational_metrics"]["generation_latency_ms"] >= 0
+    assert response_body["operational_metrics"]["total_latency_ms"] == (
+        response_body["latency_ms"]
+    )
+    assert response_body["operational_metrics"]["token_usage"] == {
+        "input_tokens": 84,
+        "output_tokens": 19,
+        "total_tokens": 103,
+    }
     assert len(response_body["sources"]) == 1
     assert response_body["sources"][0]["source"] == "runbooks/payment-unreachable.md"
     assert response_body["sources"][0]["section"] == "Diagnosi"
