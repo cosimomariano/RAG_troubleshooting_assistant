@@ -61,7 +61,7 @@ def create_app(rag_service: TroubleshootingService) -> FastAPI:
             "API per analizzare incidenti tecnici in applicazioni backend "
             "a microservizi tramite una pipeline RAG."
         ),
-        version="0.2.0",
+        version="0.3.0",
     )
     controller = TroubleshootingController(rag_service)
 
