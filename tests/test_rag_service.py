@@ -32,13 +32,16 @@ def build_result() -> RetrievalResult:
             document_type="runbook",
             service="payment",
             section="Diagnosi",
+            category="service-unavailable",
         ),
     )
     return RetrievalResult(
         chunk=chunk,
         rank=1,
-        score=0.93,
-        retriever="dense",
+        score=None,
+        retriever="rrf",
+        fused_score=0.0328,
+        reranker_score=4.82,
     )
 
 
@@ -75,14 +78,23 @@ def test_rag_service_connects_retrieval_prompt_and_generation() -> None:
         )
     ]
     assert len(llm_client.received_prompts) == 1
-    assert "[FONTE 1]" in llm_client.received_prompts[0]
+    assert "[FONTE_1]" in llm_client.received_prompts[0]
     assert response.answer == ("La causa probabile è l'indisponibilità del servizio payment.")
     assert response.latency_ms >= 0
     assert response.sources[0].model_dump() == {
+        "citation_id": "FONTE_1",
+        "document_id": "runbook-payment",
         "source": "knowledge_base/runbooks/payment-unreachable.md",
         "chunk_id": "payment-unreachable-001",
+        "document_type": "runbook",
         "section": "Diagnosi",
         "service": "payment",
+        "category": "service-unavailable",
+        "rank": 1,
+        "retriever": "rrf",
+        "score": None,
+        "fused_score": 0.0328,
+        "reranker_score": 4.82,
     }
 
 

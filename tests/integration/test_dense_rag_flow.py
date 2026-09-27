@@ -121,10 +121,15 @@ def test_dense_rag_request_reaches_mocked_ollama_with_retrieved_evidence(
     assert response_body["sources"][0]["source"] == "runbooks/payment-unreachable.md"
     assert response_body["sources"][0]["section"] == "Diagnosi"
     assert response_body["sources"][0]["chunk_id"].startswith("chunk-")
+    assert response_body["sources"][0]["citation_id"] == "FONTE_1"
+    assert response_body["sources"][0]["document_id"].startswith("document-")
+    assert response_body["sources"][0]["document_type"] == "markdown"
+    assert response_body["sources"][0]["rank"] == 1
+    assert response_body["sources"][0]["retriever"] == "dense"
 
     prompt_sent_to_ollama = ollama_request["prompt"]
     assert isinstance(prompt_sent_to_ollama, str)
-    assert "[FONTE 1]" in prompt_sent_to_ollama
+    assert "[FONTE_1]" in prompt_sent_to_ollama
     assert "runbooks/payment-unreachable.md" in prompt_sent_to_ollama
     assert "connection refused" in prompt_sent_to_ollama
     assert "[MASCHERATO:IP_PRIVATO]" in prompt_sent_to_ollama

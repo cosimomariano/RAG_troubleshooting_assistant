@@ -1,6 +1,6 @@
 import pytest
 
-from app.generation import PromptBuilder
+from app.generation import CitationFormatter, PromptBuilder
 from app.models import DocumentChunk, RetrievalResult, SourceMetadata
 
 
@@ -80,10 +80,11 @@ def test_retrieved_chunks_keep_their_order_and_provenance() -> None:
         documents=[first_result, second_result],
     )
 
-    first_source_position = prompt.index("[FONTE 1]")
-    second_source_position = prompt.index("[FONTE 2]")
+    first_source_position = prompt.index("[FONTE_1]")
+    second_source_position = prompt.index("[FONTE_2]")
 
     assert first_source_position < second_source_position
+    assert "document_id: runbook-checkout" in prompt
     assert "chunk_id: payment-unreachable-001" in prompt
     assert "documento: knowledge_base/runbooks/payment-unreachable.md" in prompt
     assert "servizio: payment" in prompt
@@ -134,3 +135,9 @@ def test_question_and_incident_context_are_trimmed() -> None:
 def test_empty_question_is_rejected(question: str) -> None:
     with pytest.raises(ValueError, match="Domanda non valorizzata."):
         PromptBuilder().build(question=question, documents=[])
+
+
+@pytest.mark.parametrize("position", [0, -1])
+def test_citation_identifier_requires_a_positive_position(position: int) -> None:
+    with pytest.raises(ValueError, match="maggiore di zero"):
+        CitationFormatter.build_identifier(position)

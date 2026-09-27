@@ -34,7 +34,7 @@ class DeterministicExperimentSystem:
                 answer="Il servizio Payment è raggiungibile ma la chiamata Charge fallisce.",
                 sources=[
                     self._source("architecture/system-overview.md", "architecture-001"),
-                    self._source("runbooks/payment-failure.md", "payment-001"),
+                    self._source("runbooks/payment-failure.md", "payment-001", rank=2),
                 ],
                 latency_ms=10.0,
             )
@@ -46,8 +46,17 @@ class DeterministicExperimentSystem:
         )
 
     @staticmethod
-    def _source(source: str, chunk_id: str) -> SourceReference:
-        return SourceReference(source=source, chunk_id=chunk_id)
+    def _source(source: str, chunk_id: str, rank: int = 1) -> SourceReference:
+        return SourceReference(
+            citation_id=f"FONTE_{rank}",
+            document_id=f"document-{chunk_id}",
+            source=source,
+            chunk_id=chunk_id,
+            document_type="markdown",
+            rank=rank,
+            retriever="dense",
+            score=0.9,
+        )
 
 
 def build_cases() -> list[GoldenCase]:

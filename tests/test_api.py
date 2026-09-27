@@ -27,10 +27,18 @@ class RecordingTroubleshootingService:
             answer="Il servizio payment non è raggiungibile dal checkout.",
             sources=[
                 SourceReference(
+                    citation_id="FONTE_1",
+                    document_id="document-payment-unreachable",
                     source="runbooks/payment-unreachable.md",
                     chunk_id="payment-unreachable-001",
+                    document_type="runbook",
                     section="Diagnosi",
                     service="payment",
+                    category="service-unavailable",
+                    rank=1,
+                    retriever="hybrid",
+                    fused_score=0.0328,
+                    reranker_score=4.82,
                 )
             ],
             latency_ms=18.5,
@@ -96,10 +104,19 @@ def test_api_accepts_normalized_telemetry_and_returns_sources() -> None:
         "answer": "Il servizio payment non è raggiungibile dal checkout.",
         "sources": [
             {
+                "citation_id": "FONTE_1",
+                "document_id": "document-payment-unreachable",
                 "source": "runbooks/payment-unreachable.md",
                 "chunk_id": "payment-unreachable-001",
+                "document_type": "runbook",
                 "section": "Diagnosi",
                 "service": "payment",
+                "category": "service-unavailable",
+                "rank": 1,
+                "retriever": "hybrid",
+                "score": None,
+                "fused_score": 0.0328,
+                "reranker_score": 4.82,
             }
         ],
         "latency_ms": 18.5,

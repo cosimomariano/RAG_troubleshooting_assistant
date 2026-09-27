@@ -1,6 +1,6 @@
 from time import perf_counter
 
-from app.generation import LLMClient, PromptBuilder
+from app.generation import CitationFormatter, LLMClient, PromptBuilder
 from app.models import RAGResponse, RetrievalResult, SourceReference
 from app.retrieval import Retriever
 
@@ -75,18 +75,32 @@ class RAGService:
     @staticmethod
     def _build_sources(documents: list[RetrievalResult]) -> list[SourceReference]:
         sources: list[SourceReference] = []
-        for retrieval_result in documents:
-            sources.append(RAGService._build_source(retrieval_result))
+        for citation_position, retrieval_result in enumerate(documents, start=1):
+            sources.append(
+                RAGService._build_source(citation_position, retrieval_result)
+            )
         return sources
 
     @staticmethod
-    def _build_source(retrieval_result: RetrievalResult) -> SourceReference:
+    def _build_source(
+        citation_position: int,
+        retrieval_result: RetrievalResult,
+    ) -> SourceReference:
         chunk = retrieval_result.chunk
         return SourceReference(
+            citation_id=CitationFormatter.build_identifier(citation_position),
+            document_id=chunk.document_id,
             source=chunk.metadata.source,
             chunk_id=chunk.id,
+            document_type=chunk.metadata.document_type,
             section=chunk.metadata.section,
             service=chunk.metadata.service,
+            category=chunk.metadata.category,
+            rank=retrieval_result.rank,
+            retriever=retrieval_result.retriever,
+            score=retrieval_result.score,
+            fused_score=retrieval_result.fused_score,
+            reranker_score=retrieval_result.reranker_score,
         )
 
     @staticmethod

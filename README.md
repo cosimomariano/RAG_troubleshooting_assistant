@@ -62,9 +62,9 @@ La pipeline è separata in una fase offline di preparazione della conoscenza e u
 - **Sparse Retrieval**: indicizzazione lessicale e ricerca Top-K tramite BM25. Implementato.
 - **Hybrid Retrieval**: recupero parallelo sparse e dense con una graduatoria unificata. Implementato.
 - **Fusion e reranking**: combinazione tramite RRF e riordinamento opzionale con Cross-Encoder, con misurazione separata delle latenze dei due stadi. Implementato.
-- **Prompt assembly**: unione di istruzioni, domanda, contesto dell'incidente, chunk recuperati e riferimenti alle fonti. (eventuale embed dei puntamenti alle fonti come prompt engineering strategy)
+- **Prompt assembly**: unione di istruzioni, domanda, contesto dell'incidente, chunk recuperati e identificativi deterministici delle fonti nel formato `[FONTE_n]`.
 - **Generazione**: invocazione REST di un LLM servito da Ollama su una macchina remota della rete privata.
-- **Risposta**: restituzione di diagnosi, verifiche suggerite, fonti e metriche di latenza.
+- **Risposta**: restituzione di diagnosi, verifiche suggerite, citazioni strutturate e metriche di latenza. Ogni citazione conserva documento, chunk, sezione, rank, retriever e punteggi disponibili.
 
 ## Struttura del progetto
 
