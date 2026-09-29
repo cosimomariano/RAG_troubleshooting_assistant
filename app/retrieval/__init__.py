@@ -6,6 +6,7 @@ from app.retrieval.fusion import RankFusion, ReciprocalRankFusion
 from app.retrieval.hybrid import HybridRetriever
 from app.retrieval.mode import RetrievalMode
 from app.retrieval.no_retrieval import NoRetrievalRetriever
+from app.retrieval.selection import RetrieverSelector
 from app.retrieval.sparse import SparseRetriever
 
 __all__ = [
@@ -15,8 +16,9 @@ __all__ = [
     "NoRetrievalRetriever",
     "RankFusion",
     "ReciprocalRankFusion",
-    "RetrievalMode",
     "RetrievalExecution",
+    "RetrievalMode",
     "Retriever",
+    "RetrieverSelector",
     "SparseRetriever",
 ]

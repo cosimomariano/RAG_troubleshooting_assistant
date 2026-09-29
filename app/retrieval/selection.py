@@ -1,16 +1,8 @@
-from enum import StrEnum
 from app.retrieval.base import Retriever
+from app.retrieval.mode import RetrievalMode
 from app.retrieval.no_retrieval import NoRetrievalRetriever
 
-# Enum con le possibili modalita di recupero (vedi application.yml)
-class RetrievalMode(StrEnum):
-    LLM_ONLY = "llm_only"
-    DENSE = "dense"
-    SPARSE = "sparse"
-    HYBRID = "hybrid"
 
-
-# Selettore del modello di recupero
 class RetrieverSelector:
     def __init__(
         self,
@@ -35,9 +27,9 @@ class RetrieverSelector:
             return mode
 
         normalized_mode = mode.strip().casefold()
+
         try:
             return RetrievalMode(normalized_mode)
-        #Controllo che la modalita usata sia effettivamente supportata
         except ValueError as error:
             supported_modes = ", ".join(item.value for item in RetrievalMode)
             raise ValueError(
