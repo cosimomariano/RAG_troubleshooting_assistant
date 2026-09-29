@@ -6,11 +6,7 @@ from pydantic import Field
 from app.models import OperationalMetrics, RAGResponse, SourceReference, StrictModel
 
 
-class StrictApiModel(StrictModel):
-    pass
-
-
-class LogEvidence(StrictApiModel):
+class LogEvidence(StrictModel):
     timestamp: datetime | None = Field(
         default=None,
         description="Timestamp del log, se disponibile.",
@@ -27,14 +23,14 @@ class LogEvidence(StrictApiModel):
         min_length=1,
         description="Messaggio di log normalizzato.",
     )
-    error_type: str | None = Field(
+    errorType: str | None = Field(
         default=None,
         description="Tipo di errore o eccezione, se disponibile.",
     )
 
 
-class SpanEvidence(StrictApiModel):
-    span_id: str | None = Field(
+class SpanEvidence(StrictModel):
+    spanId: str | None = Field(
         default=None,
         description="Identificativo dello span, se disponibile.",
     )
@@ -49,17 +45,17 @@ class SpanEvidence(StrictApiModel):
     status: Literal["OK", "ERROR", "UNSET"] = Field(
         description="Stato normalizzato dello span.",
     )
-    peer_service: str | None = Field(
+    peerService: str | None = Field(
         default=None,
         description="Servizio remoto coinvolto nell'operazione, se disponibile.",
     )
-    error_message: str | None = Field(
+    errorMessage: str | None = Field(
         default=None,
         description="Messaggio di errore associato allo span, se disponibile.",
     )
 
 
-class MetricEvidence(StrictApiModel):
+class MetricEvidence(StrictModel):
     service: str | None = Field(
         default=None,
         description="Microservizio al quale la metrica è associata.",
@@ -75,8 +71,8 @@ class MetricEvidence(StrictApiModel):
     )
 
 
-class TelemetryContext(StrictApiModel):
-    trace_id: str | None = Field(
+class TelemetryContext(StrictModel):
+    traceId: str | None = Field(
         default=None,
         description="Identificativo della trace associata all'incidente.",
     )
@@ -94,12 +90,12 @@ class TelemetryContext(StrictApiModel):
     )
 
 
-class TroubleshootingRequest(StrictApiModel):
+class TroubleshootingRequest(StrictModel):
     question: str = Field(
         min_length=1,
         description="Domanda tecnica alla quale l'assistente deve rispondere.",
     )
-    incident_context: str | None = Field(
+    incidentContext: str | None = Field(
         default=None,
         description="Descrizione testuale opzionale del contesto dell'incidente.",
     )
@@ -113,7 +109,7 @@ class TroubleshootingRequest(StrictApiModel):
     )
 
 
-class TroubleshootingResponse(StrictApiModel):
+class TroubleshootingResponse(StrictModel):
     answer: str = Field(
         min_length=1,
         description="Risposta generata sulla base delle evidenze recuperate.",
@@ -121,22 +117,22 @@ class TroubleshootingResponse(StrictApiModel):
     sources: list[SourceReference] = Field(
         description="Fonti documentali utilizzate per costruire la risposta.",
     )
-    latency_ms: float = Field(
+    latencyMs: float = Field(
         ge=0,
         description="Tempo totale di elaborazione espresso in millisecondi.",
     )
-    operational_metrics: OperationalMetrics = Field(
+    operationalMetrics: OperationalMetrics = Field(
         description="Dettaglio delle latenze operative e dell'utilizzo dei token.",
     )
 
     @classmethod
-    def from_rag_response(cls, response: RAGResponse) -> "TroubleshootingResponse":
+    def fromRagResponse(cls, response: RAGResponse) -> "TroubleshootingResponse":
         """Converte il risultato interno del RAG nel body pubblico dell'API."""
 
         return cls.model_validate(response.model_dump())
 
 
-class ErrorResponse(StrictApiModel):
+class ErrorResponse(StrictModel):
     code: str = Field(
         min_length=1,
         description="Codice applicativo stabile che identifica l'errore.",

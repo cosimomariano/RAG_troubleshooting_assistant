@@ -7,22 +7,22 @@ from openapi_spec_validator import OpenAPIV31SpecValidator, validate
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-def load_yaml(relative_path: str) -> dict:
-    content = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
+def loadYaml(relativePath: str) -> dict:
+    content = (PROJECT_ROOT / relativePath).read_text(encoding="utf-8")
     document = yaml.safe_load(content)
 
     assert isinstance(document, dict)
     return document
 
 
-def test_troubleshooting_openapi_is_a_valid_version_31_contract() -> None:
-    specification = load_yaml("contracts/openapi/troubleshooting-api.yaml")
+def testTroubleshootingOpenapiIsAValidVersion31Contract() -> None:
+    specification = loadYaml("contracts/openapi/troubleshooting-api.yaml")
 
     validate(specification, cls=OpenAPIV31SpecValidator)
 
 
-def test_configuration_exposes_only_components_available_at_this_stage() -> None:
-    configuration = load_yaml("configs/application.yaml")
+def testConfigurationExposesOnlyComponentsAvailableAtThisStage() -> None:
+    configuration = loadYaml("configs/application.yaml")
 
     assert set(configuration) == {
         "application",
@@ -40,9 +40,7 @@ def test_configuration_exposes_only_components_available_at_this_stage() -> None
     }
     assert configuration["application"]["name"] == "rag-troubleshooting-assistant"
     assert configuration["ingestion"]["supported_extensions"] == [".md", ".txt"]
-    assert configuration["ingestion"]["knowledge_base_version"] == (
-        "${KNOWLEDGE_BASE_VERSION}"
-    )
+    assert configuration["ingestion"]["knowledge_base_version"] == ("${KNOWLEDGE_BASE_VERSION}")
     assert (
         configuration["chunking"]["chunk_overlap_characters"]
         < configuration["chunking"]["chunk_size_characters"]
@@ -79,15 +77,15 @@ def test_configuration_exposes_only_components_available_at_this_stage() -> None
     }
 
 
-def test_every_configuration_placeholder_has_an_env_example_entry() -> None:
+def testEveryConfigurationPlaceholderHasAnEnvExampleEntry() -> None:
     configuration = (PROJECT_ROOT / "configs/application.yaml").read_text(encoding="utf-8")
-    env_example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+    envExample = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
 
-    configured_variables = set(re.findall(r"\$\{([A-Z][A-Z0-9_]*)\}", configuration))
-    documented_variables = {
+    configuredVariables = set(re.findall(r"\$\{([A-Z][A-Z0-9_]*)\}", configuration))
+    documentedVariables = {
         line.partition("=")[0].strip()
-        for line in env_example.splitlines()
+        for line in envExample.splitlines()
         if line.strip() and not line.lstrip().startswith("#")
     }
 
-    assert configured_variables == documented_variables
+    assert configuredVariables == documentedVariables

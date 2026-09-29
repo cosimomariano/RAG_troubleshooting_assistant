@@ -27,86 +27,86 @@ Fonti consultate:"""
         self,
         question: str,
         documents: Sequence[RetrievalResult],
-        incident_context: str | None = None,
+        incidentContext: str | None = None,
     ) -> str:
-        normalized_question = self._normalize_question(question)
-        prompt_sections = self._build_sections(
-            normalized_question,
+        normalizedQuestion = self.normalizeQuestion(question)
+        promptSections = self.buildSections(
+            normalizedQuestion,
             documents,
-            incident_context,
+            incidentContext,
         )
-        return self.SECTION_SEPARATOR.join(prompt_sections)
+        return self.SECTION_SEPARATOR.join(promptSections)
 
-    def _build_sections(
+    def buildSections(
         self,
         question: str,
         documents: Sequence[RetrievalResult],
-        incident_context: str | None,
+        incidentContext: str | None,
     ) -> list[str]:
         return [
-            self._build_section("ISTRUZIONI DI SISTEMA", self.SYSTEM_INSTRUCTIONS),
-            self._build_section(
+            self.buildSection("ISTRUZIONI DI SISTEMA", self.SYSTEM_INSTRUCTIONS),
+            self.buildSection(
                 "CONTESTO DELL'INCIDENTE",
-                self._format_incident_context(incident_context),
+                self.formatIncidentContext(incidentContext),
             ),
-            self._build_section(
+            self.buildSection(
                 "EVIDENZE RECUPERATE",
-                self._format_evidence(documents),
+                self.formatEvidence(documents),
             ),
-            self._build_section("DOMANDA DELL'UTENTE", question),
-            self._build_section("FORMATO DELLA RISPOSTA", self.RESPONSE_FORMAT),
+            self.buildSection("DOMANDA DELL'UTENTE", question),
+            self.buildSection("FORMATO DELLA RISPOSTA", self.RESPONSE_FORMAT),
         ]
 
     @staticmethod
-    def _normalize_question(question: str) -> str:
-        normalized_question = question.strip()
-        if not normalized_question:
+    def normalizeQuestion(question: str) -> str:
+        normalizedQuestion = question.strip()
+        if not normalizedQuestion:
             raise ValueError("Domanda non valorizzata.")
-        return normalized_question
+        return normalizedQuestion
 
     @staticmethod
-    def _build_section(title: str, content: str) -> str:
+    def buildSection(title: str, content: str) -> str:
         return f"{title}\n{content}"
 
-    def _format_incident_context(self, incident_context: str | None) -> str:
-        if incident_context is None:
+    def formatIncidentContext(self, incidentContext: str | None) -> str:
+        if incidentContext is None:
             return self.MISSING_INCIDENT_CONTEXT
 
-        normalized_context = incident_context.strip()
-        if not normalized_context:
+        normalizedContext = incidentContext.strip()
+        if not normalizedContext:
             return self.MISSING_INCIDENT_CONTEXT
-        return normalized_context
+        return normalizedContext
 
-    def _format_evidence(self, documents: Sequence[RetrievalResult]) -> str:
+    def formatEvidence(self, documents: Sequence[RetrievalResult]) -> str:
         if not documents:
             return self.MISSING_EVIDENCE
 
-        formatted_sources: list[str] = []
-        for source_number, retrieval_result in enumerate(documents, start=1):
-            formatted_source = self._format_source(source_number, retrieval_result)
-            formatted_sources.append(formatted_source)
-        return self.SECTION_SEPARATOR.join(formatted_sources)
+        formattedSources: list[str] = []
+        for sourceNumber, retrievalResult in enumerate(documents, start=1):
+            formattedSource = self.formatSource(sourceNumber, retrievalResult)
+            formattedSources.append(formattedSource)
+        return self.SECTION_SEPARATOR.join(formattedSources)
 
     @staticmethod
-    def _format_source(source_number: int, result: RetrievalResult) -> str:
+    def formatSource(sourceNumber: int, result: RetrievalResult) -> str:
         chunk = result.chunk
         metadata = chunk.metadata
 
-        source_details = [
-            CitationFormatter.format_reference(source_number),
-            f"document_id: {chunk.document_id}",
+        sourceDetails = [
+            CitationFormatter.formatReference(sourceNumber),
+            f"document_id: {chunk.documentId}",
             f"chunk_id: {chunk.id}",
             f"documento: {metadata.source}",
-            f"tipo_documento: {metadata.document_type}",
+            f"tipo_documento: {metadata.documentType}",
         ]
 
         if metadata.service:
-            source_details.append(f"servizio: {metadata.service}")
+            sourceDetails.append(f"servizio: {metadata.service}")
         if metadata.section:
-            source_details.append(f"sezione: {metadata.section}")
+            sourceDetails.append(f"sezione: {metadata.section}")
         if metadata.category:
-            source_details.append(f"categoria: {metadata.category}")
+            sourceDetails.append(f"categoria: {metadata.category}")
 
-        source_details.append("contenuto:")
-        source_details.append(chunk.text.strip())
-        return "\n".join(source_details)
+        sourceDetails.append("contenuto:")
+        sourceDetails.append(chunk.text.strip())
+        return "\n".join(sourceDetails)

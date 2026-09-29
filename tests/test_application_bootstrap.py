@@ -1,32 +1,66 @@
 from collections.abc import Sequence
 from pathlib import Path
 
+import pytest
+
 from app.bootstrap import KnowledgeBaseIndexer, RAGApplicationFactory
 from app.config import ApplicationConfiguration, ApplicationConfigurationLoader
 from app.generation import StubLLMClient
 from app.indexing import EmbeddingVector, FaissVectorIndex
+from app.models import RetrievalResult
+from app.reranking import RerankingRetriever
+from app.retrieval import NoRetrievalRetriever
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 KNOWLEDGE_BASE = PROJECT_ROOT / "tests" / "fixtures" / "knowledge_base"
 
 
 class ReadableEmbeddingModel:
-    model_name = "embedding-test"
+    modelName = "embedding-test"
 
     def encode(self, texts: Sequence[str]) -> list[EmbeddingVector]:
-        return [self._encode_text(text) for text in texts]
+        return [self.encodeText(text) for text in texts]
 
     @staticmethod
-    def _encode_text(text: str) -> EmbeddingVector:
-        normalized_text = text.casefold()
-        if "payment" in normalized_text or "pagamento" in normalized_text:
+    def encodeText(text: str) -> EmbeddingVector:
+        normalizedText = text.casefold()
+        if "payment" in normalizedText or "pagamento" in normalizedText:
             return [1.0, 0.0, 0.0]
-        if "cart" in normalized_text or "carrello" in normalized_text:
+        if "cart" in normalizedText or "carrello" in normalizedText:
             return [0.0, 1.0, 0.0]
         return [0.0, 0.0, 1.0]
 
 
-def build_configuration(tmp_path: Path, retrieval_mode: str = "dense") -> ApplicationConfiguration:
+class RecordingReranker:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, int, int]] = []
+
+    def rerank(
+        self,
+        query: str,
+        candidates: Sequence[RetrievalResult],
+        topK: int,
+    ) -> list[RetrievalResult]:
+        self.calls.append((query, len(candidates), topK))
+        return [
+            candidate.model_copy(
+                update={
+                    "rank": rank,
+                    "rerankerScore": float(len(candidates) - rank + 1),
+                }
+            )
+            for rank, candidate in enumerate(candidates[:topK], start=1)
+        ]
+
+
+def buildConfiguration(
+    tmp_path: Path,
+    retrievalMode: str = "dense",
+    *,
+    rerankerEnabled: bool = False,
+    topK: int = 1,
+    candidateTopN: int = 2,
+) -> ApplicationConfiguration:
     environment = {
         "APP_ENV": "test",
         "SERVER_HOST": "127.0.0.1",
@@ -39,12 +73,12 @@ def build_configuration(tmp_path: Path, retrieval_mode: str = "dense") -> Applic
         "KNOWLEDGE_BASE_VERSION": "kb-test-v1",
         "EMBEDDING_MODEL": "embedding-test",
         "VECTOR_STORE_PATH": str(tmp_path / "vector-store"),
-        "RETRIEVAL_MODE": retrieval_mode,
-        "RETRIEVAL_TOP_K": "1",
-        "RERANKER_ENABLED": "false",
+        "RETRIEVAL_MODE": retrievalMode,
+        "RETRIEVAL_TOP_K": str(topK),
+        "RERANKER_ENABLED": str(rerankerEnabled).lower(),
         "RERANKER_MODEL": "reranker-test",
         "RERANKER_BATCH_SIZE": "4",
-        "RERANKER_CANDIDATE_TOP_N": "2",
+        "RERANKER_CANDIDATE_TOP_N": str(candidateTopN),
         "GOLDEN_DATASET_PATH": str(tmp_path / "cases.jsonl"),
         "EXPERIMENT_RESULTS_PATH": str(tmp_path / "results"),
     }
@@ -54,51 +88,117 @@ def build_configuration(tmp_path: Path, retrieval_mode: str = "dense") -> Applic
     )
 
 
-def test_indexer_builds_a_reloadable_dense_index(tmp_path: Path) -> None:
-    configuration = build_configuration(tmp_path)
+def testIndexerBuildsAReloadableDenseIndex(tmp_path: Path) -> None:
+    configuration = buildConfiguration(tmp_path)
     report = KnowledgeBaseIndexer(
         configuration,
-        embedding_model=ReadableEmbeddingModel(),
+        embeddingModel=ReadableEmbeddingModel(),
     ).build()
 
-    reloaded_index = FaissVectorIndex.load(configuration.vector_store.path)
+    reloadedIndex = FaissVectorIndex.load(configuration.vectorStore.path)
 
-    assert report.document_count == 2
-    assert report.chunk_count == reloaded_index.size
-    assert report.vector_dimension == 3
-    assert report.output_path == configuration.vector_store.path
+    assert report.documentCount == 2
+    assert report.chunkCount == reloadedIndex.getSize()
+    assert report.vectorDimension == 3
+    assert report.outputPath == configuration.vectorStore.path
 
 
-def test_factory_connects_persisted_index_retrieval_prompt_and_generation(
+def testFactoryConnectsPersistedIndexRetrievalPromptAndGeneration(
     tmp_path: Path,
 ) -> None:
-    configuration = build_configuration(tmp_path)
-    embedding_model = ReadableEmbeddingModel()
-    KnowledgeBaseIndexer(configuration, embedding_model=embedding_model).build()
-    llm_client = StubLLMClient("Il servizio Payment non è raggiungibile. [FONTE_1]")
+    configuration = buildConfiguration(tmp_path)
+    embeddingModel = ReadableEmbeddingModel()
+    KnowledgeBaseIndexer(configuration, embeddingModel=embeddingModel).build()
+    llmClient = StubLLMClient("Il servizio Payment non è raggiungibile. [FONTE_1]")
 
-    rag_service = RAGApplicationFactory(
+    ragService = RAGApplicationFactory(
         configuration,
-        embedding_model=embedding_model,
-        llm_client=llm_client,
-    ).create_rag_service()
-    response = rag_service.troubleshoot(
+        embeddingModel=embeddingModel,
+        llmClient=llmClient,
+    ).createRagService()
+    response = ragService.troubleshoot(
         question="Perché il pagamento non viene completato?",
-        incident_context="payment/charge restituisce connection refused",
+        incidentContext="payment/charge restituisce connection refused",
     )
 
     assert response.sources[0].source == "runbooks/payment-unreachable.md"
-    assert "[FONTE_1]" in llm_client.received_prompts[0]
+    assert "[FONTE_1]" in llmClient.receivedPrompts[0]
 
 
-def test_sparse_factory_does_not_require_a_persisted_faiss_index(tmp_path: Path) -> None:
-    configuration = build_configuration(tmp_path, retrieval_mode="sparse")
-    rag_service = RAGApplicationFactory(
+def testSparseFactoryDoesNotRequireAPersistedFaissIndex(tmp_path: Path) -> None:
+    configuration = buildConfiguration(tmp_path, retrievalMode="sparse")
+    ragService = RAGApplicationFactory(
         configuration,
-        llm_client=StubLLMClient("Verificare il runbook recuperato. [FONTE_1]"),
-    ).create_rag_service()
+        llmClient=StubLLMClient("Verificare il runbook recuperato. [FONTE_1]"),
+    ).createRagService()
 
-    response = rag_service.troubleshoot("Errore payment connection refused")
+    response = ragService.troubleshoot("Errore payment connection refused")
 
     assert response.sources
     assert response.sources[0].retriever == "sparse"
+
+
+def testFactoryCreatesLlmOnlyBaselineWithoutIndexes(tmp_path: Path) -> None:
+    configuration = buildConfiguration(tmp_path, retrievalMode="llm_only")
+    ragService = RAGApplicationFactory(
+        configuration,
+        llmClient=StubLLMClient("Le informazioni non sono sufficienti."),
+    ).createRagService()
+
+    response = ragService.troubleshoot("Perché il checkout non risponde?")
+
+    assert isinstance(ragService.retriever, NoRetrievalRetriever)
+    assert response.sources == []
+
+
+def testHybridFactoryCombinesSparseAndDenseRetrieval(tmp_path: Path) -> None:
+    configuration = buildConfiguration(tmp_path, retrievalMode="hybrid")
+    embeddingModel = ReadableEmbeddingModel()
+    KnowledgeBaseIndexer(configuration, embeddingModel=embeddingModel).build()
+    ragService = RAGApplicationFactory(
+        configuration,
+        embeddingModel=embeddingModel,
+        llmClient=StubLLMClient("Consultare il runbook recuperato. [FONTE_1]"),
+    ).createRagService()
+
+    response = ragService.troubleshoot("Errore payment connection refused")
+
+    assert response.sources
+    assert response.sources[0].retriever == "rrf"
+
+
+def testFactoryAppliesConfiguredCandidateCountToReranking(tmp_path: Path) -> None:
+    configuration = buildConfiguration(
+        tmp_path,
+        retrievalMode="sparse",
+        rerankerEnabled=True,
+        topK=1,
+        candidateTopN=2,
+    )
+    reranker = RecordingReranker()
+    ragService = RAGApplicationFactory(
+        configuration,
+        llmClient=StubLLMClient("Consultare la prima fonte. [FONTE_1]"),
+        reranker=reranker,
+    ).createRagService()
+
+    response = ragService.troubleshoot("Errore payment connection refused")
+
+    assert isinstance(ragService.retriever, RerankingRetriever)
+    assert ragService.retriever.candidateTopN == 2
+    assert reranker.calls == [("Errore payment connection refused", 2, 1)]
+    assert response.sources[0].rerankerScore == 2.0
+
+
+def testFactoryRejectsRerankingForLlmOnlyBaseline(tmp_path: Path) -> None:
+    configuration = buildConfiguration(
+        tmp_path,
+        retrievalMode="llm_only",
+        rerankerEnabled=True,
+    )
+
+    with pytest.raises(ValueError, match="LLM-only"):
+        RAGApplicationFactory(
+            configuration,
+            llmClient=StubLLMClient("Risposta non utilizzata."),
+        ).createRagService()

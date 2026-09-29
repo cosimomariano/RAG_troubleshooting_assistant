@@ -2,8 +2,7 @@
 
 from app.api.application import (
     TroubleshootingController,
-    TroubleshootingService,
-    create_app,
+    createApp,
 )
 from app.api.incident_context import IncidentContextBuilder
 from app.api.schemas import (
@@ -26,6 +25,5 @@ __all__ = [
     "TroubleshootingRequest",
     "TroubleshootingResponse",
     "TroubleshootingController",
-    "TroubleshootingService",
-    "create_app",
+    "createApp",
 ]

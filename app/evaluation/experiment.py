@@ -1,129 +1,118 @@
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
-from typing import Protocol, runtime_checkable
 
 from pydantic import Field
 
 from app.evaluation.cases import GoldenCase
 from app.evaluation.configuration import ExperimentConfiguration
 from app.evaluation.metrics import RetrievalMetricsCalculator
-from app.models import OperationalMetrics, RAGResponse, SourceReference, StrictModel
+from app.models import OperationalMetrics, SourceReference, StrictModel
+from app.services import TroubleshootingSystem
 
 TimestampProvider = Callable[[], datetime]
 
 
-@runtime_checkable
-class ExperimentSystem(Protocol):
-    """Sistema RAG interrogabile dal runner sperimentale."""
-
-    def troubleshoot(
-        self,
-        question: str,
-        incident_context: str | None = None,
-    ) -> RAGResponse: ...
-
-
 class ExperimentMetadata(StrictModel):
-    dataset_path: str = Field(
+    datasetPath: str = Field(
         min_length=1,
         description="Percorso del golden dataset utilizzato",
     )
-    knowledge_base_version: str = Field(
+    knowledgeBaseVersion: str = Field(
         min_length=1,
         description="Versione della Knowledge Base utilizzata",
     )
-    git_commit: str | None = Field(
+    gitCommit: str | None = Field(
         default=None,
         description="Commit Git dal quale è stato eseguito l'esperimento",
     )
-    model_identifiers: dict[str, str] = Field(
+    modelIdentifiers: dict[str, str] = Field(
         default_factory=dict,
         description="Identificativi dei modelli impiegati dalla configurazione",
     )
 
 
 class ExperimentCaseResult(StrictModel):
-    case_id: str = Field(min_length=1, description="Identificativo del golden case")
+    caseId: str = Field(min_length=1, description="Identificativo del golden case")
     question: str = Field(min_length=1, description="Domanda sottoposta al sistema")
-    expected_answer: str = Field(
+    expectedAnswer: str = Field(
         min_length=1,
         description="Risposta di riferimento annotata nel golden dataset",
     )
-    generated_answer: str = Field(
+    generatedAnswer: str = Field(
         min_length=1,
         description="Risposta generata dal sistema RAG",
     )
-    relevant_documents: tuple[str, ...] = Field(
+    relevantDocuments: tuple[str, ...] = Field(
         min_length=1,
         description="Documenti rilevanti annotati per il caso",
     )
-    retrieved_sources: tuple[SourceReference, ...] = Field(
+    retrievedSources: tuple[SourceReference, ...] = Field(
         description="Fonti recuperate dal sistema nell'ordine di ranking",
     )
-    recall_at_k: float = Field(
+    recallAtK: float = Field(
         ge=0,
         le=1,
         description="Recall calcolato sulle prime K fonti recuperate",
     )
-    reciprocal_rank: float = Field(
+    reciprocalRank: float = Field(
         ge=0,
         le=1,
         description="Inverso della posizione della prima fonte rilevante",
     )
-    latency_ms: float = Field(
+    latencyMs: float = Field(
         ge=0,
         description="Latenza complessiva del caso in millisecondi",
     )
-    operational_metrics: OperationalMetrics = Field(
+    operationalMetrics: OperationalMetrics = Field(
         description="Metriche operative raccolte durante il caso",
     )
 
 
 class ExperimentMetrics(StrictModel):
-    case_count: int = Field(ge=1, description="Numero di golden case eseguiti")
-    top_k: int = Field(ge=1, description="Profondità della graduatoria valutata")
-    mean_recall_at_k: float = Field(
+    caseCount: int = Field(ge=1, description="Numero di golden case eseguiti")
+    topK: int = Field(ge=1, description="Profondità della graduatoria valutata")
+    meanRecallAtK: float = Field(
         ge=0,
         le=1,
         description="Recall@K medio sui casi eseguiti",
     )
-    mean_reciprocal_rank: float = Field(
+    meanReciprocalRank: float = Field(
         ge=0,
         le=1,
         description="Mean Reciprocal Rank dei casi eseguiti",
     )
-    mean_latency_ms: float = Field(
+    meanLatencyMs: float = Field(
         ge=0,
         description="Latenza media complessiva in millisecondi",
     )
-    mean_retrieval_latency_ms: float = Field(
+    meanRetrievalLatencyMs: float = Field(
         ge=0,
         description="Latenza media del retrieval in millisecondi",
     )
-    mean_reranking_latency_ms: float = Field(
+    meanRerankingLatencyMs: float = Field(
         ge=0,
         description="Latenza media del reranking in millisecondi",
     )
-    mean_prompt_build_latency_ms: float = Field(
+    meanPromptBuildLatencyMs: float = Field(
         ge=0,
         description="Latenza media della costruzione del prompt in millisecondi",
     )
-    mean_generation_latency_ms: float = Field(
+    meanGenerationLatencyMs: float = Field(
         ge=0,
         description="Latenza media della generazione in millisecondi",
     )
-    token_usage_case_count: int = Field(
+    tokenUsageCaseCount: int = Field(
         ge=0,
         description="Numero di casi per i quali il provider ha comunicato i token",
     )
-    total_input_tokens: int = Field(ge=0, description="Token di input complessivi")
-    total_output_tokens: int = Field(ge=0, description="Token di output complessivi")
-    total_tokens: int = Field(ge=0, description="Token complessivi dell'esperimento")
+    totalInputTokens: int = Field(ge=0, description="Token di input complessivi")
+    totalOutputTokens: int = Field(ge=0, description="Token di output complessivi")
+    totalTokens: int = Field(ge=0, description="Token complessivi dell'esperimento")
 
 
 class ExperimentRun(StrictModel):
-    run_id: str = Field(min_length=1, description="Identificativo univoco dell'esecuzione")
-    executed_at: datetime = Field(description="Istante di avvio dell'esecuzione")
+    runId: str = Field(min_length=1, description="Identificativo univoco dell'esecuzione")
+    executedAt: datetime = Field(description="Istante di avvio dell'esecuzione")
     configuration: ExperimentConfiguration
     metadata: ExperimentMetadata
     metrics: ExperimentMetrics
@@ -138,16 +127,16 @@ class ExperimentRunner:
 
     def __init__(
         self,
-        system: ExperimentSystem,
-        top_k: int,
-        timestamp_provider: TimestampProvider | None = None,
+        system: TroubleshootingSystem,
+        topK: int,
+        timestampProvider: TimestampProvider | None = None,
     ) -> None:
-        if top_k < 1:
+        if topK < 1:
             raise ValueError("Il valore Top-K dell'esperimento deve essere maggiore di zero.")
 
-        self._system = system
-        self._top_k = top_k
-        self._timestamp_provider = timestamp_provider or self._current_utc_time
+        self.system = system
+        self.topK = topK
+        self.timestampProvider = timestampProvider or self.currentUtcTime
 
     def execute(
         self,
@@ -158,114 +147,97 @@ class ExperimentRunner:
         if not cases:
             raise ValueError("È richiesto almeno un golden case per l'esperimento.")
 
-        execution_time = self._timestamp_provider()
-        if execution_time.tzinfo is None or execution_time.utcoffset() is None:
+        executionTime = self.timestampProvider()
+        if executionTime.tzinfo is None or executionTime.utcoffset() is None:
             raise ValueError("Il timestamp dell'esperimento deve includere il fuso orario.")
 
-        case_results = tuple(self._execute_case(case) for case in cases)
+        caseResults = tuple(self.executeCase(case) for case in cases)
 
         return ExperimentRun(
-            run_id=self._build_run_id(configuration.experiment.id, execution_time),
-            executed_at=execution_time,
+            runId=self.buildRunId(configuration.experiment.id, executionTime),
+            executedAt=executionTime,
             configuration=configuration,
             metadata=metadata,
-            metrics=self._calculate_metrics(case_results),
-            cases=case_results,
+            metrics=self.calculateMetrics(caseResults),
+            cases=caseResults,
         )
 
-    def _execute_case(self, case: GoldenCase) -> ExperimentCaseResult:
-        response = self._system.troubleshoot(
+    def executeCase(self, case: GoldenCase) -> ExperimentCaseResult:
+        response = self.system.troubleshoot(
             question=case.question,
-            incident_context=case.incident_context,
+            incidentContext=case.incidentContext,
         )
-        retrieved_sources = tuple(response.sources[: self._top_k])
-        retrieved_documents = [source.source for source in retrieved_sources]
+        retrievedSources = tuple(response.sources[: self.topK])
+        retrievedDocuments = [source.source for source in retrievedSources]
 
         return ExperimentCaseResult(
-            case_id=case.id,
+            caseId=case.id,
             question=case.question,
-            expected_answer=case.expected_answer,
-            generated_answer=response.answer,
-            relevant_documents=case.relevant_documents,
-            retrieved_sources=retrieved_sources,
-            recall_at_k=RetrievalMetricsCalculator.recall_at_k(
-                retrieved_documents,
-                case.relevant_documents,
-                self._top_k,
+            expectedAnswer=case.expectedAnswer,
+            generatedAnswer=response.answer,
+            relevantDocuments=case.relevantDocuments,
+            retrievedSources=retrievedSources,
+            recallAtK=RetrievalMetricsCalculator.recallAtK(
+                retrievedDocuments,
+                case.relevantDocuments,
+                self.topK,
             ),
-            reciprocal_rank=RetrievalMetricsCalculator.reciprocal_rank(
-                retrieved_documents,
-                case.relevant_documents,
+            reciprocalRank=RetrievalMetricsCalculator.reciprocalRank(
+                retrievedDocuments,
+                case.relevantDocuments,
             ),
-            latency_ms=response.latency_ms,
-            operational_metrics=response.operational_metrics,
+            latencyMs=response.latencyMs,
+            operationalMetrics=response.operationalMetrics,
         )
 
-    def _calculate_metrics(
+    def calculateMetrics(
         self,
-        case_results: Sequence[ExperimentCaseResult],
+        caseResults: Sequence[ExperimentCaseResult],
     ) -> ExperimentMetrics:
-        case_count = len(case_results)
-        mean_recall = sum(result.recall_at_k for result in case_results) / case_count
-        mean_reciprocal_rank = (
-            sum(result.reciprocal_rank for result in case_results) / case_count
+        caseCount = len(caseResults)
+        meanRecall = sum(result.recallAtK for result in caseResults) / caseCount
+        meanReciprocalRank = sum(result.reciprocalRank for result in caseResults) / caseCount
+        meanLatencyMs = sum(result.latencyMs for result in caseResults) / caseCount
+        meanRetrievalLatencyMs = (
+            sum(result.operationalMetrics.retrievalLatencyMs for result in caseResults) / caseCount
         )
-        mean_latency_ms = sum(result.latency_ms for result in case_results) / case_count
-        mean_retrieval_latency_ms = (
-            sum(
-                result.operational_metrics.retrieval_latency_ms
-                for result in case_results
-            )
-            / case_count
+        meanRerankingLatencyMs = (
+            sum(result.operationalMetrics.rerankingLatencyMs for result in caseResults) / caseCount
         )
-        mean_reranking_latency_ms = (
-            sum(
-                result.operational_metrics.reranking_latency_ms
-                for result in case_results
-            )
-            / case_count
+        meanPromptBuildLatencyMs = (
+            sum(result.operationalMetrics.promptBuildLatencyMs for result in caseResults)
+            / caseCount
         )
-        mean_prompt_build_latency_ms = (
-            sum(
-                result.operational_metrics.prompt_build_latency_ms
-                for result in case_results
-            )
-            / case_count
+        meanGenerationLatencyMs = (
+            sum(result.operationalMetrics.generationLatencyMs for result in caseResults) / caseCount
         )
-        mean_generation_latency_ms = (
-            sum(
-                result.operational_metrics.generation_latency_ms
-                for result in case_results
-            )
-            / case_count
-        )
-        token_usages = [
-            result.operational_metrics.token_usage
-            for result in case_results
-            if result.operational_metrics.token_usage is not None
+        tokenUsages = [
+            result.operationalMetrics.tokenUsage
+            for result in caseResults
+            if result.operationalMetrics.tokenUsage is not None
         ]
 
         return ExperimentMetrics(
-            case_count=case_count,
-            top_k=self._top_k,
-            mean_recall_at_k=mean_recall,
-            mean_reciprocal_rank=mean_reciprocal_rank,
-            mean_latency_ms=mean_latency_ms,
-            mean_retrieval_latency_ms=mean_retrieval_latency_ms,
-            mean_reranking_latency_ms=mean_reranking_latency_ms,
-            mean_prompt_build_latency_ms=mean_prompt_build_latency_ms,
-            mean_generation_latency_ms=mean_generation_latency_ms,
-            token_usage_case_count=len(token_usages),
-            total_input_tokens=sum(usage.input_tokens for usage in token_usages),
-            total_output_tokens=sum(usage.output_tokens for usage in token_usages),
-            total_tokens=sum(usage.total_tokens for usage in token_usages),
+            caseCount=caseCount,
+            topK=self.topK,
+            meanRecallAtK=meanRecall,
+            meanReciprocalRank=meanReciprocalRank,
+            meanLatencyMs=meanLatencyMs,
+            meanRetrievalLatencyMs=meanRetrievalLatencyMs,
+            meanRerankingLatencyMs=meanRerankingLatencyMs,
+            meanPromptBuildLatencyMs=meanPromptBuildLatencyMs,
+            meanGenerationLatencyMs=meanGenerationLatencyMs,
+            tokenUsageCaseCount=len(tokenUsages),
+            totalInputTokens=sum(usage.inputTokens for usage in tokenUsages),
+            totalOutputTokens=sum(usage.outputTokens for usage in tokenUsages),
+            totalTokens=sum(usage.totalTokens for usage in tokenUsages),
         )
 
     @staticmethod
-    def _build_run_id(experiment_id: str, execution_time: datetime) -> str:
-        timestamp = execution_time.astimezone(UTC).strftime("%Y%m%dT%H%M%S%fZ")
-        return f"{timestamp}_{experiment_id}"
+    def buildRunId(experimentId: str, executionTime: datetime) -> str:
+        timestamp = executionTime.astimezone(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+        return f"{timestamp}_{experimentId}"
 
     @staticmethod
-    def _current_utc_time() -> datetime:
+    def currentUtcTime() -> datetime:
         return datetime.now(UTC)

@@ -24,11 +24,11 @@ class RetrievalResult(StrictModel):
         min_length=1,
         description="Tipo di retriever che ha prodotto il risultato",
     )
-    fused_score: float | None = Field(
+    fusedScore: float | None = Field(
         default=None,
         description="Punteggio prodotto dalla fusione di più graduatorie",
     )
-    reranker_score: float | None = Field(
+    rerankerScore: float | None = Field(
         default=None,
         description="Punteggio assegnato dal modello di reranking",
     )

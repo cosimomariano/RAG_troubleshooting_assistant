@@ -1,7 +1,10 @@
 from enum import StrEnum
 from pathlib import Path
+
 from pydantic import Field, ValidationError, field_validator
+
 from app.models.base import StrictModel
+
 
 class CaseDifficulty(StrEnum):
     """Difficoltà usata per segmentare i risultati sperimentali."""
@@ -11,6 +14,7 @@ class CaseDifficulty(StrEnum):
     PARAPHRASE = "paraphrase"
     DISTRIBUTED = "distributed"
 
+
 class GoldenCase(StrictModel):
     id: str = Field(
         min_length=1,
@@ -18,15 +22,15 @@ class GoldenCase(StrictModel):
         description="Identificativo stabile del caso sperimentale",
     )
     question: str = Field(min_length=1, description="Domanda sottoposta al sistema")
-    incident_context: str = Field(
+    incidentContext: str = Field(
         min_length=1,
         description="Evidenze sintetiche o raccolte relative all'incidente",
     )
-    expected_answer: str = Field(
+    expectedAnswer: str = Field(
         min_length=1,
         description="Contenuto minimo atteso nella diagnosi",
     )
-    relevant_documents: tuple[str, ...] = Field(
+    relevantDocuments: tuple[str, ...] = Field(
         min_length=1,
         description="Percorsi relativi dei documenti rilevanti nella Knowledge Base",
     )
@@ -34,7 +38,7 @@ class GoldenCase(StrictModel):
         default=None,
         description="Microservizio principalmente interessato",
     )
-    expected_root_cause: str | None = Field(
+    expectedRootCause: str | None = Field(
         default=None,
         description="Causa radice attesa per il caso",
     )
@@ -43,61 +47,61 @@ class GoldenCase(StrictModel):
         description="Classe di difficoltà del caso sperimentale",
     )
 
-    @field_validator("id", "question", "incident_context", "expected_answer", mode="before")
+    @field_validator("id", "question", "incidentContext", "expectedAnswer", mode="before")
     @classmethod
-    def normalize_required_text(cls, value: object) -> object:
+    def normalizeRequiredText(cls, value: object) -> object:
         if isinstance(value, str):
             return value.strip()
         return value
 
-    @field_validator("service", "expected_root_cause", mode="before")
+    @field_validator("service", "expectedRootCause", mode="before")
     @classmethod
-    def normalize_optional_text(cls, value: object) -> object:
+    def normalizeOptionalText(cls, value: object) -> object:
         if isinstance(value, str):
-            normalized_value = value.strip()
-            return normalized_value or None
+            normalizedValue = value.strip()
+            return normalizedValue or None
         return value
 
-    @field_validator("relevant_documents", mode="before")
+    @field_validator("relevantDocuments", mode="before")
     @classmethod
-    def normalize_relevant_documents(cls, value: object) -> object:
+    def normalizeRelevantDocuments(cls, value: object) -> object:
         if not isinstance(value, (list, tuple)):
             return value
 
-        normalized_documents: list[str] = []
+        normalizedDocuments: list[str] = []
         for document in value:
             if not isinstance(document, str) or not document.strip():
                 raise ValueError("Ogni documento rilevante deve avere un percorso non vuoto.")
-            normalized_documents.append(document.strip().replace("\\", "/"))
+            normalizedDocuments.append(document.strip().replace("\\", "/"))
 
-        if len(normalized_documents) != len(set(normalized_documents)):
+        if len(normalizedDocuments) != len(set(normalizedDocuments)):
             raise ValueError("I documenti rilevanti non possono contenere duplicati.")
-        return tuple(normalized_documents)
+        return tuple(normalizedDocuments)
 
 
 class GoldenCaseLoader:
     """Carica e valida un golden dataset nel formato JSON Lines."""
 
-    def load(self, dataset_path: str | Path) -> list[GoldenCase]:
-        path = Path(dataset_path)
-        self._validate_path(path)
+    def load(self, datasetPath: str | Path) -> list[GoldenCase]:
+        path = Path(datasetPath)
+        self.validatePath(path)
 
         cases: list[GoldenCase] = []
-        case_ids: set[str] = set()
+        caseIds: set[str] = set()
 
-        for line_number, raw_line in enumerate(
+        for lineNumber, rawLine in enumerate(
             path.read_text(encoding="utf-8").splitlines(),
             start=1,
         ):
-            serialized_case = raw_line.strip()
-            if not serialized_case:
+            serializedCase = rawLine.strip()
+            if not serializedCase:
                 continue
 
-            case = self._parse_case(serialized_case, line_number)
-            if case.id in case_ids:
+            case = self.parseCase(serializedCase, lineNumber)
+            if case.id in caseIds:
                 raise ValueError(f"Identificativo del caso duplicato: {case.id}")
 
-            case_ids.add(case.id)
+            caseIds.add(case.id)
             cases.append(case)
 
         if not cases:
@@ -105,15 +109,15 @@ class GoldenCaseLoader:
         return cases
 
     @staticmethod
-    def _validate_path(path: Path) -> None:
+    def validatePath(path: Path) -> None:
         if not path.is_file():
             raise FileNotFoundError(f"Golden dataset non trovato: {path}")
 
     @staticmethod
-    def _parse_case(serialized_case: str, line_number: int) -> GoldenCase:
+    def parseCase(serializedCase: str, lineNumber: int) -> GoldenCase:
         try:
-            return GoldenCase.model_validate_json(serialized_case)
+            return GoldenCase.model_validate_json(serializedCase)
         except ValidationError as error:
             raise ValueError(
-                f"Caso del golden dataset non valido alla riga {line_number}."
+                f"Caso del golden dataset non valido alla riga {lineNumber}."
             ) from error

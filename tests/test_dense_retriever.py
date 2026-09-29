@@ -9,42 +9,42 @@ from app.retrieval import DenseRetriever, Retriever
 
 class QueryEmbeddingModel:
     def __init__(self, vectors: list[EmbeddingVector]) -> None:
-        self.model_name = "test-query-encoder"
+        self.modelName = "test-query-encoder"
         self.vectors = vectors
-        self.encoded_batches: list[list[str]] = []
+        self.encodedBatches: list[list[str]] = []
 
     def encode(self, texts: Sequence[str]) -> list[EmbeddingVector]:
-        self.encoded_batches.append(list(texts))
+        self.encodedBatches.append(list(texts))
         return self.vectors
 
 
-def build_runbook_chunk(chunk_id: str, text: str) -> DocumentChunk:
+def buildRunbookChunk(chunkId: str, text: str) -> DocumentChunk:
     return DocumentChunk(
-        id=chunk_id,
-        document_id="runbook-checkout",
+        id=chunkId,
+        documentId="runbook-checkout",
         text=text,
         metadata=SourceMetadata(
             source="knowledge_base/runbooks/checkout.md",
-            document_type="runbook",
+            documentType="runbook",
             service="checkout",
             section="diagnosi",
         ),
     )
 
 
-def build_checkout_index() -> FaissVectorIndex:
+def buildCheckoutIndex() -> FaissVectorIndex:
     index = FaissVectorIndex(dimension=3)
     index.add(
         [
-            build_runbook_chunk(
+            buildRunbookChunk(
                 "payment-unreachable",
                 "Il checkout non riesce a raggiungere il servizio payment.",
             ),
-            build_runbook_chunk(
+            buildRunbookChunk(
                 "cart-empty",
                 "Il carrello non contiene prodotti.",
             ),
-            build_runbook_chunk(
+            buildRunbookChunk(
                 "payment-timeout",
                 "Il servizio payment supera il timeout configurato.",
             ),
@@ -54,20 +54,20 @@ def build_checkout_index() -> FaissVectorIndex:
     return index
 
 
-def test_dense_retriever_satisfies_common_retriever_contract() -> None:
+def testDenseRetrieverSatisfiesCommonRetrieverContract() -> None:
     retriever = DenseRetriever(
-        embedding_model=QueryEmbeddingModel([[1.0, 0.0, 0.0]]),
-        vector_index=build_checkout_index(),
+        embeddingModel=QueryEmbeddingModel([[1.0, 0.0, 0.0]]),
+        vectorIndex=buildCheckoutIndex(),
     )
 
     assert isinstance(retriever, Retriever)
 
 
-def test_query_is_embedded_and_nearest_chunks_are_ranked() -> None:
-    embedding_model = QueryEmbeddingModel([[1.0, 0.0, 0.0]])
+def testQueryIsEmbeddedAndNearestChunksAreRanked() -> None:
+    embeddingModel = QueryEmbeddingModel([[1.0, 0.0, 0.0]])
     retriever = DenseRetriever(
-        embedding_model=embedding_model,
-        vector_index=build_checkout_index(),
+        embeddingModel=embeddingModel,
+        vectorIndex=buildCheckoutIndex(),
     )
 
     results = retriever.retrieve(
@@ -75,7 +75,7 @@ def test_query_is_embedded_and_nearest_chunks_are_ranked() -> None:
         k=2,
     )
 
-    assert embedding_model.encoded_batches == [["Perché il checkout non raggiunge payment?"]]
+    assert embeddingModel.encodedBatches == [["Perché il checkout non raggiunge payment?"]]
     assert [result.chunk.id for result in results] == [
         "payment-unreachable",
         "payment-timeout",
@@ -85,10 +85,10 @@ def test_query_is_embedded_and_nearest_chunks_are_ranked() -> None:
     assert {result.retriever for result in results} == {"dense"}
 
 
-def test_top_k_larger_than_index_returns_only_available_chunks() -> None:
+def testTopKLargerThanIndexReturnsOnlyAvailableChunks() -> None:
     retriever = DenseRetriever(
-        embedding_model=QueryEmbeddingModel([[1.0, 0.0, 0.0]]),
-        vector_index=build_checkout_index(),
+        embeddingModel=QueryEmbeddingModel([[1.0, 0.0, 0.0]]),
+        vectorIndex=buildCheckoutIndex(),
     )
 
     results = retriever.retrieve("Errore durante il pagamento", k=10)
@@ -97,22 +97,46 @@ def test_top_k_larger_than_index_returns_only_available_chunks() -> None:
     assert [result.rank for result in results] == [1, 2, 3]
 
 
-def test_empty_index_does_not_invoke_embedding_model() -> None:
-    embedding_model = QueryEmbeddingModel([[1.0, 0.0, 0.0]])
+def testEmptyIndexDoesNotInvokeEmbeddingModel() -> None:
+    embeddingModel = QueryEmbeddingModel([[1.0, 0.0, 0.0]])
     retriever = DenseRetriever(
-        embedding_model=embedding_model,
-        vector_index=FaissVectorIndex(dimension=3),
+        embeddingModel=embeddingModel,
+        vectorIndex=FaissVectorIndex(dimension=3),
     )
 
     assert retriever.retrieve("Errore nel checkout", k=3) == []
-    assert embedding_model.encoded_batches == []
+    assert embeddingModel.encodedBatches == []
 
 
-def test_embedding_model_must_return_one_vector_for_the_query() -> None:
+def testEmbeddingModelMustReturnOneVectorForTheQuery() -> None:
     retriever = DenseRetriever(
-        embedding_model=QueryEmbeddingModel([]),
-        vector_index=build_checkout_index(),
+        embeddingModel=QueryEmbeddingModel([]),
+        vectorIndex=buildCheckoutIndex(),
     )
 
     with pytest.raises(ValueError, match="un solo embedding"):
         retriever.retrieve("Errore nel checkout", k=3)
+
+
+@pytest.mark.parametrize(
+    ("query", "topK", "expectedMessage"),
+    [
+        pytest.param("   ", 2, "query", id="query-vuota"),
+        pytest.param("payment failure", 0, "parametro k", id="top-k-non-positivo"),
+    ],
+)
+def testDenseRetrieverRejectsInvalidRequests(
+    query: str,
+    topK: int,
+    expectedMessage: str,
+) -> None:
+    embeddingModel = QueryEmbeddingModel([[1.0, 0.0, 0.0]])
+    retriever = DenseRetriever(
+        embeddingModel=embeddingModel,
+        vectorIndex=buildCheckoutIndex(),
+    )
+
+    with pytest.raises(ValueError, match=expectedMessage):
+        retriever.retrieve(query, topK)
+
+    assert embeddingModel.encodedBatches == []

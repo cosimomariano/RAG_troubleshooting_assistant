@@ -4,8 +4,8 @@ from app.generation import CitationFormatter, PromptBuilder
 from app.models import DocumentChunk, RetrievalResult, SourceMetadata
 
 
-def build_result(
-    chunk_id: str,
+def buildResult(
+    chunkId: str,
     text: str,
     *,
     rank: int,
@@ -14,12 +14,12 @@ def build_result(
     section: str | None = None,
 ) -> RetrievalResult:
     chunk = DocumentChunk(
-        id=chunk_id,
-        document_id="runbook-checkout",
+        id=chunkId,
+        documentId="runbook-checkout",
         text=text,
         metadata=SourceMetadata(
             source=source,
-            document_type="runbook",
+            documentType="runbook",
             service=service,
             section=section,
         ),
@@ -32,8 +32,8 @@ def build_result(
     )
 
 
-def test_prompt_separates_incident_evidence_question_and_output_format() -> None:
-    result = build_result(
+def testPromptSeparatesIncidentEvidenceQuestionAndOutputFormat() -> None:
+    result = buildResult(
         "payment-unreachable-001",
         "Il checkout riceve connection refused dal servizio payment.",
         rank=1,
@@ -44,7 +44,7 @@ def test_prompt_separates_incident_evidence_question_and_output_format() -> None
 
     prompt = PromptBuilder().build(
         question="Perché il checkout non completa il pagamento?",
-        incident_context="La chiamata payment/charge termina con errore.",
+        incidentContext="La chiamata payment/charge termina con errore.",
         documents=[result],
     )
 
@@ -57,8 +57,8 @@ def test_prompt_separates_incident_evidence_question_and_output_format() -> None
     assert "Verifiche consigliate:" in prompt
 
 
-def test_retrieved_chunks_keep_their_order_and_provenance() -> None:
-    first_result = build_result(
+def testRetrievedChunksKeepTheirOrderAndProvenance() -> None:
+    firstResult = buildResult(
         "payment-unreachable-001",
         "Il servizio payment non è raggiungibile.",
         rank=1,
@@ -66,7 +66,7 @@ def test_retrieved_chunks_keep_their_order_and_provenance() -> None:
         service="payment",
         section="Possibili cause",
     )
-    second_result = build_result(
+    secondResult = buildResult(
         "checkout-dependencies-002",
         "Checkout dipende dal servizio payment per completare il pagamento.",
         rank=2,
@@ -77,13 +77,13 @@ def test_retrieved_chunks_keep_their_order_and_provenance() -> None:
 
     prompt = PromptBuilder().build(
         question="Quale dipendenza sta causando il problema?",
-        documents=[first_result, second_result],
+        documents=[firstResult, secondResult],
     )
 
-    first_source_position = prompt.index("[FONTE_1]")
-    second_source_position = prompt.index("[FONTE_2]")
+    firstSourcePosition = prompt.index("[FONTE_1]")
+    secondSourcePosition = prompt.index("[FONTE_2]")
 
-    assert first_source_position < second_source_position
+    assert firstSourcePosition < secondSourcePosition
     assert "document_id: runbook-checkout" in prompt
     assert "chunk_id: payment-unreachable-001" in prompt
     assert "documento: knowledge_base/runbooks/payment-unreachable.md" in prompt
@@ -91,8 +91,8 @@ def test_retrieved_chunks_keep_their_order_and_provenance() -> None:
     assert "sezione: Possibili cause" in prompt
 
 
-def test_optional_metadata_is_omitted_instead_of_rendering_none() -> None:
-    result = build_result(
+def testOptionalMetadataIsOmittedInsteadOfRenderingNone() -> None:
+    result = buildResult(
         "generic-error-001",
         "Controllare lo stato delle dipendenze del servizio.",
         rank=1,
@@ -109,7 +109,7 @@ def test_optional_metadata_is_omitted_instead_of_rendering_none() -> None:
     assert "None" not in prompt
 
 
-def test_missing_context_and_evidence_are_explicit() -> None:
+def testMissingContextAndEvidenceAreExplicit() -> None:
     prompt = PromptBuilder().build(
         question="Qual è la causa dell'errore?",
         documents=[],
@@ -120,10 +120,10 @@ def test_missing_context_and_evidence_are_explicit() -> None:
     assert "Se le informazioni non sono sufficienti, dichiaralo esplicitamente." in prompt
 
 
-def test_question_and_incident_context_are_trimmed() -> None:
+def testQuestionAndIncidentContextAreTrimmed() -> None:
     prompt = PromptBuilder().build(
         question="  Perché payment non risponde?  ",
-        incident_context="  connection refused  ",
+        incidentContext="  connection refused  ",
         documents=[],
     )
 
@@ -132,12 +132,12 @@ def test_question_and_incident_context_are_trimmed() -> None:
 
 
 @pytest.mark.parametrize("question", ["", "   "])
-def test_empty_question_is_rejected(question: str) -> None:
+def testEmptyQuestionIsRejected(question: str) -> None:
     with pytest.raises(ValueError, match="Domanda non valorizzata."):
         PromptBuilder().build(question=question, documents=[])
 
 
 @pytest.mark.parametrize("position", [0, -1])
-def test_citation_identifier_requires_a_positive_position(position: int) -> None:
+def testCitationIdentifierRequiresAPositivePosition(position: int) -> None:
     with pytest.raises(ValueError, match="maggiore di zero"):
-        CitationFormatter.build_identifier(position)
+        CitationFormatter.buildIdentifier(position)

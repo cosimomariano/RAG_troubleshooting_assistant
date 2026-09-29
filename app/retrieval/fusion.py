@@ -1,27 +1,29 @@
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
+
 from app.models import DocumentChunk, RetrievalContribution, RetrievalResult
 
 
 @runtime_checkable
 class RankFusion(Protocol):
-    #Contratto per la combinazione di piu graduatore (dense + sparse)
+    # Contratto per la combinazione di piu graduatore (dense + sparse)
 
     def fuse(
         self,
         rankings: Sequence[Sequence[RetrievalResult]],
     ) -> list[RetrievalResult]: ...
 
+
 @dataclass
-class _FusedCandidate:
+class FusedCandidate:
     chunk: DocumentChunk
-    first_seen_order: int
-    fused_score: float = 0.0
+    firstSeenOrder: int
+    fusedScore: float = 0.0
     contributions: list[RetrievalContribution] = field(default_factory=list)
 
-    def add(self, result: RetrievalResult, rank_constant: int) -> None:
-        self.fused_score += 1.0 / (rank_constant + result.rank)
+    def add(self, result: RetrievalResult, rankConstant: int) -> None:
+        self.fusedScore += 1.0 / (rankConstant + result.rank)
         self.contributions.append(
             RetrievalContribution(
                 retriever=result.retriever,
@@ -30,66 +32,65 @@ class _FusedCandidate:
             )
         )
 
+
 class ReciprocalRankFusion:
     """Combina più graduatorie usando la posizione dei risultati."""
 
     DEFAULT_RANK_CONSTANT = 60
     RETRIEVER_NAME = "rrf"
 
-    def __init__(self, rank_constant: int = DEFAULT_RANK_CONSTANT) -> None:
-        if rank_constant <= 0:
+    def __init__(self, rankConstant: int = DEFAULT_RANK_CONSTANT) -> None:
+        if rankConstant <= 0:
             raise ValueError("La costante RRF deve essere maggiore di zero.")
-        self._rank_constant = rank_constant
+        self.rankConstant = rankConstant
 
     def fuse(
         self,
         rankings: Sequence[Sequence[RetrievalResult]],
     ) -> list[RetrievalResult]:
-        candidates = self._collect_candidates(rankings)
-        ordered_candidates = sorted(
+        candidates = self.collectCandidates(rankings)
+        orderedCandidates = sorted(
             candidates.values(),
-            key=lambda candidate: (-candidate.fused_score, candidate.first_seen_order),
+            key=lambda candidate: (-candidate.fusedScore, candidate.firstSeenOrder),
         )
-        return self._map_results(ordered_candidates)
+        return self.mapResults(orderedCandidates)
 
-    def _collect_candidates(
+    def collectCandidates(
         self,
         rankings: Sequence[Sequence[RetrievalResult]],
-    ) -> dict[str, _FusedCandidate]:
-        candidates: dict[str, _FusedCandidate] = {}
-        next_first_seen_order = 0
+    ) -> dict[str, FusedCandidate]:
+        candidates: dict[str, FusedCandidate] = {}
+        nextFirstSeenOrder = 0
 
         for ranking in rankings:
-            chunk_ids_in_ranking: set[str] = set()
+            chunkIdsInRanking: set[str] = set()
 
             for result in ranking:
-                chunk_id = result.chunk.id
-                if chunk_id in chunk_ids_in_ranking:
-                    raise ValueError(
-                        f"Il chunk '{chunk_id}' risulta duplicato"
-                    )
-                chunk_ids_in_ranking.add(chunk_id)
+                chunkId = result.chunk.id
+                if chunkId in chunkIdsInRanking:
+                    raise ValueError(f"Il chunk '{chunkId}' risulta duplicato")
+                chunkIdsInRanking.add(chunkId)
 
-                candidate = candidates.get(chunk_id)
+                candidate = candidates.get(chunkId)
                 if candidate is None:
-                    candidate = _FusedCandidate(
+                    candidate = FusedCandidate(
                         chunk=result.chunk,
-                        first_seen_order=next_first_seen_order,
+                        firstSeenOrder=nextFirstSeenOrder,
                     )
-                    candidates[chunk_id] = candidate
-                    next_first_seen_order += 1
+                    candidates[chunkId] = candidate
+                    nextFirstSeenOrder += 1
                 elif candidate.chunk != result.chunk:
                     raise ValueError(
-                        f"Il chunk '{chunk_id}' ha contenuti diversi tra le graduatorie"
+                        f"Il chunk '{chunkId}' ha contenuti diversi tra le graduatorie"
                     )
 
-                candidate.add(result, self._rank_constant)
+                candidate.add(result, self.rankConstant)
 
         return candidates
 
-    def _map_results(
+    def mapResults(
         self,
-        candidates: Sequence[_FusedCandidate],
+        candidates: Sequence[FusedCandidate],
     ) -> list[RetrievalResult]:
         results: list[RetrievalResult] = []
 
@@ -100,7 +101,7 @@ class ReciprocalRankFusion:
                     rank=rank,
                     score=None,
                     retriever=self.RETRIEVER_NAME,
-                    fused_score=candidate.fused_score,
+                    fusedScore=candidate.fusedScore,
                     contributions=tuple(candidate.contributions),
                 )
             )

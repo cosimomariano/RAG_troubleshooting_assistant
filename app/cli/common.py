@@ -7,23 +7,25 @@ DEFAULT_APPLICATION_CONFIGURATION = Path("configs/application.yaml")
 DEFAULT_ENVIRONMENT_FILE = Path(".env")
 
 
-def add_application_configuration_arguments(parser: ArgumentParser) -> None:
+def addApplicationConfigurationArguments(parser: ArgumentParser) -> None:
     parser.add_argument(
         "--application-config",
+        dest="applicationConfig",
         type=Path,
         default=DEFAULT_APPLICATION_CONFIGURATION,
         help="Percorso del file YAML di configurazione applicativa.",
     )
     parser.add_argument(
         "--env-file",
+        dest="environmentFile",
         type=Path,
         default=DEFAULT_ENVIRONMENT_FILE,
         help="Percorso del file contenente le variabili d'ambiente.",
     )
 
 
-def load_application_configuration(arguments: Namespace) -> ApplicationConfiguration:
+def loadApplicationConfiguration(arguments: Namespace) -> ApplicationConfiguration:
     return ApplicationConfigurationLoader().load(
-        configuration_path=arguments.application_config,
-        environment_file=arguments.env_file,
+        configurationPath=arguments.applicationConfig,
+        environmentFile=arguments.environmentFile,
     )

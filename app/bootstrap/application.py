@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api import create_app
+from app.api import createApp
 from app.bootstrap.knowledge_base import KnowledgeBaseProcessor
 from app.config import ApplicationConfiguration
 from app.generation import LLMClient, OllamaLLMClient, PromptBuilder
@@ -24,135 +24,135 @@ class RAGApplicationFactory:
     def __init__(
         self,
         configuration: ApplicationConfiguration,
-        embedding_model: EmbeddingModel | None = None,
-        llm_client: LLMClient | None = None,
+        embeddingModel: EmbeddingModel | None = None,
+        llmClient: LLMClient | None = None,
         reranker: Reranker | None = None,
     ) -> None:
-        self._configuration = configuration
-        self._embedding_model = embedding_model
-        self._llm_client = llm_client
-        self._reranker = reranker
+        self.configuration = configuration
+        self.embeddingModel = embeddingModel
+        self.llmClient = llmClient
+        self.reranker = reranker
 
-    def create_api(
+    def createApi(
         self,
-        retrieval_mode: RetrievalMode | None = None,
-        reranker_enabled: bool | None = None,
+        retrievalMode: RetrievalMode | None = None,
+        rerankerEnabled: bool | None = None,
     ) -> FastAPI:
-        rag_service = self.create_rag_service(retrieval_mode, reranker_enabled)
-        return create_app(rag_service)
+        ragService = self.createRagService(retrievalMode, rerankerEnabled)
+        return createApp(ragService)
 
-    def create_rag_service(
+    def createRagService(
         self,
-        retrieval_mode: RetrievalMode | None = None,
-        reranker_enabled: bool | None = None,
+        retrievalMode: RetrievalMode | None = None,
+        rerankerEnabled: bool | None = None,
     ) -> RAGService:
-        selected_mode = retrieval_mode or self._configuration.retrieval.mode
-        use_reranker = (
-            self._configuration.reranker.enabled
-            if reranker_enabled is None
-            else reranker_enabled
+        selectedMode = retrievalMode or self.configuration.retrieval.mode
+        useReranker = (
+            self.configuration.reranker.enabled if rerankerEnabled is None else rerankerEnabled
         )
 
-        retriever = self._create_retriever(selected_mode, use_reranker)
-        retriever = self._apply_reranker(retriever, selected_mode, use_reranker)
+        candidateCount = self.configuration.retrieval.topK
+        if useReranker:
+            candidateCount = self.validateRerankingConfiguration(selectedMode)
+
+        baseRetriever = self.createBaseRetriever(selectedMode, candidateCount)
+        retriever = baseRetriever
+        if useReranker:
+            retriever = self.createRerankingRetriever(
+                baseRetriever,
+                candidateCount,
+            )
+
         return RAGService(
             retriever=retriever,
-            prompt_builder=PromptBuilder(),
-            llm_client=self._get_llm_client(),
-            top_k=self._configuration.retrieval.top_k,
+            promptBuilder=PromptBuilder(),
+            llmClient=self.getLlmClient(),
+            topK=self.configuration.retrieval.topK,
         )
 
-    def _create_retriever(
+    def createBaseRetriever(
         self,
         mode: RetrievalMode,
-        reranker_enabled: bool,
+        candidateCount: int,
     ) -> Retriever:
         if mode is RetrievalMode.LLM_ONLY:
             return NoRetrievalRetriever()
         if mode is RetrievalMode.DENSE:
-            return self._create_dense_retriever()
+            return self.createDenseRetriever()
         if mode is RetrievalMode.SPARSE:
-            return self._create_sparse_retriever()
+            return self.createSparseRetriever()
         if mode is RetrievalMode.HYBRID:
-            return self._create_hybrid_retriever(reranker_enabled)
+            return self.createHybridRetriever(candidateCount)
         raise ValueError(f"Modalità di retrieval non supportata: {mode}.")
 
-    def _create_dense_retriever(self) -> DenseRetriever:
-        vector_index = FaissVectorIndex.load(self._configuration.vector_store.path)
+    def createDenseRetriever(self) -> DenseRetriever:
+        vectorIndex = FaissVectorIndex.load(self.configuration.vectorStore.path)
         return DenseRetriever(
-            embedding_model=self._get_embedding_model(),
-            vector_index=vector_index,
+            embeddingModel=self.getEmbeddingModel(),
+            vectorIndex=vectorIndex,
         )
 
-    def _create_sparse_retriever(self) -> SparseRetriever:
-        chunks = KnowledgeBaseProcessor(self._configuration).prepare_chunks()
-        sparse_index = BM25SparseIndex(chunks)
-        return SparseRetriever(sparse_index)
+    def createSparseRetriever(self) -> SparseRetriever:
+        chunks = KnowledgeBaseProcessor(self.configuration).prepareChunks()
+        sparseIndex = BM25SparseIndex(chunks)
+        return SparseRetriever(sparseIndex)
 
-    def _create_hybrid_retriever(self, reranker_enabled: bool) -> HybridRetriever:
-        candidate_count = self._configuration.retrieval.top_k
-        if reranker_enabled:
-            candidate_count = max(
-                candidate_count,
-                self._configuration.reranker.candidate_top_n,
-            )
-
+    def createHybridRetriever(self, candidateCount: int) -> HybridRetriever:
         return HybridRetriever(
-            sparse_retriever=self._create_sparse_retriever(),
-            dense_retriever=self._create_dense_retriever(),
-            rank_fusion=ReciprocalRankFusion(),
-            sparse_top_k=candidate_count,
-            dense_top_k=candidate_count,
+            sparseRetriever=self.createSparseRetriever(),
+            denseRetriever=self.createDenseRetriever(),
+            rankFusion=ReciprocalRankFusion(),
+            sparseTopK=candidateCount,
+            denseTopK=candidateCount,
         )
 
-    def _apply_reranker(
+    def createRerankingRetriever(
         self,
-        retriever: Retriever,
-        mode: RetrievalMode,
-        reranker_enabled: bool,
-    ) -> Retriever:
-        if not reranker_enabled:
-            return retriever
+        baseRetriever: Retriever,
+        candidateCount: int,
+    ) -> RerankingRetriever:
+        return RerankingRetriever(
+            candidateRetriever=baseRetriever,
+            reranker=self.getReranker(),
+            candidateTopN=candidateCount,
+        )
+
+    def validateRerankingConfiguration(self, mode: RetrievalMode) -> int:
         if mode is RetrievalMode.LLM_ONLY:
             raise ValueError("Il reranking non può essere applicato al baseline LLM-only.")
 
-        candidate_top_n = self._configuration.reranker.candidate_top_n
-        if candidate_top_n < self._configuration.retrieval.top_k:
+        candidateTopN = self.configuration.reranker.candidateTopN
+        if candidateTopN < self.configuration.retrieval.topK:
             raise ValueError("Il Top-N del reranker non può essere minore del Top-K finale.")
+        return candidateTopN
 
-        return RerankingRetriever(
-            candidate_retriever=retriever,
-            reranker=self._get_reranker(),
-            candidate_top_n=candidate_top_n,
-        )
-
-    def _get_embedding_model(self) -> EmbeddingModel:
-        if self._embedding_model is None:
-            embedding_configuration = self._configuration.embeddings
+    def getEmbeddingModel(self) -> EmbeddingModel:
+        if self.embeddingModel is None:
+            embeddingConfiguration = self.configuration.embeddings
             from app.indexing import SentenceTransformerEmbeddingModel
 
-            self._embedding_model = SentenceTransformerEmbeddingModel(
-                model_name=embedding_configuration.model,
-                batch_size=embedding_configuration.batch_size,
-                normalize_embeddings=embedding_configuration.normalize,
+            self.embeddingModel = SentenceTransformerEmbeddingModel(
+                modelName=embeddingConfiguration.model,
+                batchSize=embeddingConfiguration.batchSize,
+                normalizeEmbeddings=embeddingConfiguration.normalize,
             )
-        return self._embedding_model
+        return self.embeddingModel
 
-    def _get_llm_client(self) -> LLMClient:
-        if self._llm_client is None:
-            llm_configuration = self._configuration.llm
-            self._llm_client = OllamaLLMClient(
-                base_url=llm_configuration.base_url,
-                model=llm_configuration.model,
-                timeout_seconds=llm_configuration.timeout_seconds,
+    def getLlmClient(self) -> LLMClient:
+        if self.llmClient is None:
+            llmConfiguration = self.configuration.llm
+            self.llmClient = OllamaLLMClient(
+                baseUrl=llmConfiguration.baseUrl,
+                model=llmConfiguration.model,
+                timeoutSeconds=llmConfiguration.timeoutSeconds,
             )
-        return self._llm_client
+        return self.llmClient
 
-    def _get_reranker(self) -> Reranker:
-        if self._reranker is None:
-            reranker_configuration = self._configuration.reranker
-            self._reranker = CrossEncoderReranker(
-                model_name=reranker_configuration.model,
-                batch_size=reranker_configuration.batch_size,
+    def getReranker(self) -> Reranker:
+        if self.reranker is None:
+            rerankerConfiguration = self.configuration.reranker
+            self.reranker = CrossEncoderReranker(
+                modelName=rerankerConfiguration.model,
+                batchSize=rerankerConfiguration.batchSize,
             )
-        return self._reranker
+        return self.reranker

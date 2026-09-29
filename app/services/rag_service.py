@@ -4,7 +4,6 @@ from time import perf_counter
 from app.generation import (
     CitationFormatter,
     LLMClient,
-    MeasuredLLMClient,
     PromptBuilder,
 )
 from app.models import (
@@ -15,6 +14,7 @@ from app.models import (
     SourceReference,
 )
 from app.retrieval import MeasuredRetriever, RetrievalExecution, Retriever
+from app.validation import RetrievalValidator
 
 Clock = Callable[[], float]
 
@@ -23,145 +23,118 @@ class RAGService:
     def __init__(
         self,
         retriever: Retriever,
-        prompt_builder: PromptBuilder,
-        llm_client: LLMClient,
-        top_k: int,
+        promptBuilder: PromptBuilder,
+        llmClient: LLMClient,
+        topK: int,
         clock: Clock = perf_counter,
     ) -> None:
-        self._validate_top_k(top_k)
-        self._retriever = retriever
-        self._prompt_builder = prompt_builder
-        self._llm_client = llm_client
-        self._top_k = top_k
-        self._clock = clock
+        self.retriever = retriever
+        self.promptBuilder = promptBuilder
+        self.llmClient = llmClient
+        self.topK = RetrievalValidator.validateTopK(topK)
+        self.clock = clock
 
     def troubleshoot(
         self,
         question: str,
-        incident_context: str | None = None,
+        incidentContext: str | None = None,
     ) -> RAGResponse:
-        total_start_time = self._clock()
+        totalStartTime = self.clock()
 
-        retrieval_query = self._build_retrieval_query(question, incident_context)
-        retrieval_execution = self._retrieve_documents(retrieval_query)
+        retrievalQuery = self.buildRetrievalQuery(question, incidentContext)
+        retrievalExecution = self.retrieveDocuments(retrievalQuery)
+        retrievedDocuments = list(retrievalExecution.results)
 
-        prompt_start_time = self._clock()
-        prompt = self._build_prompt(
-            question,
-            incident_context,
-            list(retrieval_execution.results),
+        promptStartTime = self.clock()
+        prompt = self.promptBuilder.build(
+            question=question,
+            documents=retrievedDocuments,
+            incidentContext=incidentContext,
         )
-        prompt_build_latency_ms = self._calculate_elapsed_time_ms(prompt_start_time)
+        promptBuildLatencyMs = self.calculateElapsedTimeMs(promptStartTime)
 
-        generation_start_time = self._clock()
-        generation_result = self._generate_answer(prompt)
-        generation_latency_ms = self._calculate_elapsed_time_ms(generation_start_time)
+        generationStartTime = self.clock()
+        generationResult = self.generateAnswer(prompt)
+        generationLatencyMs = self.calculateElapsedTimeMs(generationStartTime)
 
-        sources = self._build_sources(list(retrieval_execution.results))
-        total_latency_ms = self._calculate_elapsed_time_ms(total_start_time)
-        operational_metrics = OperationalMetrics(
-            retrieval_latency_ms=retrieval_execution.retrieval_latency_ms,
-            reranking_latency_ms=retrieval_execution.reranking_latency_ms,
-            prompt_build_latency_ms=prompt_build_latency_ms,
-            generation_latency_ms=generation_latency_ms,
-            total_latency_ms=total_latency_ms,
-            token_usage=generation_result.token_usage,
+        sources = self.buildSources(retrievedDocuments)
+        totalLatencyMs = self.calculateElapsedTimeMs(totalStartTime)
+        operationalMetrics = OperationalMetrics(
+            retrievalLatencyMs=retrievalExecution.retrievalLatencyMs,
+            rerankingLatencyMs=retrievalExecution.rerankingLatencyMs,
+            promptBuildLatencyMs=promptBuildLatencyMs,
+            generationLatencyMs=generationLatencyMs,
+            totalLatencyMs=totalLatencyMs,
+            tokenUsage=generationResult.tokenUsage,
         )
 
         return RAGResponse(
-            answer=generation_result.text,
+            answer=generationResult.text,
             sources=sources,
-            latency_ms=total_latency_ms,
-            operational_metrics=operational_metrics,
+            latencyMs=totalLatencyMs,
+            operationalMetrics=operationalMetrics,
         )
 
-    def _retrieve_documents(self, retrieval_query: str) -> RetrievalExecution:
-        if isinstance(self._retriever, MeasuredRetriever):
-            return self._retriever.retrieve_with_metrics(retrieval_query, self._top_k)
+    def retrieveDocuments(self, retrievalQuery: str) -> RetrievalExecution:
+        if isinstance(self.retriever, MeasuredRetriever):
+            return self.retriever.retrieveWithMetrics(retrievalQuery, self.topK)
 
-        retrieval_start_time = self._clock()
-        results = self._retriever.retrieve(retrieval_query, self._top_k)
-        retrieval_latency_ms = self._calculate_elapsed_time_ms(retrieval_start_time)
+        retrievalStartTime = self.clock()
+        results = self.retriever.retrieve(retrievalQuery, self.topK)
+        retrievalLatencyMs = self.calculateElapsedTimeMs(retrievalStartTime)
         return RetrievalExecution(
             results=tuple(results),
-            retrieval_latency_ms=retrieval_latency_ms,
+            retrievalLatencyMs=retrievalLatencyMs,
         )
 
-    def _build_prompt(
-        self,
-        question: str,
-        incident_context: str | None,
-        retrieved_documents: list[RetrievalResult],
-    ) -> str:
-        return self._prompt_builder.build(
-            question=question,
-            documents=retrieved_documents,
-            incident_context=incident_context,
-        )
+    def generateAnswer(self, prompt: str) -> LLMGenerationResult:
+        generationResult = self.llmClient.generateWithMetrics(prompt)
 
-    def _generate_answer(self, prompt: str) -> LLMGenerationResult:
-        if isinstance(self._llm_client, MeasuredLLMClient):
-            generation_result = self._llm_client.generate_with_metrics(prompt)
-        else:
-            generated_text = self._llm_client.generate(prompt).strip()
-            if not generated_text:
-                raise ValueError("Il client LLM ha restituito una risposta vuota.")
-            generation_result = LLMGenerationResult(
-                text=generated_text,
-            )
-
-        if not generation_result.text:
+        if not generationResult.text:
             raise ValueError("Il client LLM ha restituito una risposta vuota.")
-        return generation_result
+        return generationResult
 
     @staticmethod
-    def _build_retrieval_query(question: str, incident_context: str | None) -> str:
-        normalized_question = question.strip()
-        if not normalized_question:
+    def buildRetrievalQuery(question: str, incidentContext: str | None) -> str:
+        normalizedQuestion = question.strip()
+        if not normalizedQuestion:
             raise ValueError("La domanda non può essere vuota.")
 
-        query_parts = [normalized_question]
-        if incident_context is not None:
-            normalized_context = incident_context.strip()
-            if normalized_context:
-                query_parts.append(normalized_context)
-        return "\n".join(query_parts)
+        queryParts = [normalizedQuestion]
+        if incidentContext is not None:
+            normalizedContext = incidentContext.strip()
+            if normalizedContext:
+                queryParts.append(normalizedContext)
+        return "\n".join(queryParts)
 
     @staticmethod
-    def _build_sources(documents: list[RetrievalResult]) -> list[SourceReference]:
+    def buildSources(documents: list[RetrievalResult]) -> list[SourceReference]:
         sources: list[SourceReference] = []
-        for citation_position, retrieval_result in enumerate(documents, start=1):
-            sources.append(
-                RAGService._build_source(citation_position, retrieval_result)
-            )
+        for citationPosition, retrievalResult in enumerate(documents, start=1):
+            sources.append(RAGService.buildSource(citationPosition, retrievalResult))
         return sources
 
     @staticmethod
-    def _build_source(
-        citation_position: int,
-        retrieval_result: RetrievalResult,
+    def buildSource(
+        citationPosition: int,
+        retrievalResult: RetrievalResult,
     ) -> SourceReference:
-        chunk = retrieval_result.chunk
+        chunk = retrievalResult.chunk
         return SourceReference(
-            citation_id=CitationFormatter.build_identifier(citation_position),
-            document_id=chunk.document_id,
+            citationId=CitationFormatter.buildIdentifier(citationPosition),
+            documentId=chunk.documentId,
             source=chunk.metadata.source,
-            chunk_id=chunk.id,
-            document_type=chunk.metadata.document_type,
+            chunkId=chunk.id,
+            documentType=chunk.metadata.documentType,
             section=chunk.metadata.section,
             service=chunk.metadata.service,
             category=chunk.metadata.category,
-            rank=retrieval_result.rank,
-            retriever=retrieval_result.retriever,
-            score=retrieval_result.score,
-            fused_score=retrieval_result.fused_score,
-            reranker_score=retrieval_result.reranker_score,
+            rank=retrievalResult.rank,
+            retriever=retrievalResult.retriever,
+            score=retrievalResult.score,
+            fusedScore=retrievalResult.fusedScore,
+            rerankerScore=retrievalResult.rerankerScore,
         )
 
-    def _calculate_elapsed_time_ms(self, start_time: float) -> float:
-        return (self._clock() - start_time) * 1000
-
-    @staticmethod
-    def _validate_top_k(top_k: int) -> None:
-        if top_k <= 0:
-            raise ValueError("Il valore Top-K deve essere maggiore di zero.")
+    def calculateElapsedTimeMs(self, startTime: float) -> float:
+        return (self.clock() - startTime) * 1000

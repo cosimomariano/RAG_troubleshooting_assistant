@@ -7,35 +7,35 @@ from app.indexing import FaissVectorIndex, PersistentVectorIndex
 from app.models import DocumentChunk, SourceMetadata
 
 
-def build_chunk(chunk_id: str, text: str) -> DocumentChunk:
+def buildChunk(chunkId: str, text: str) -> DocumentChunk:
     return DocumentChunk(
-        id=chunk_id,
-        document_id="runbook-checkout",
+        id=chunkId,
+        documentId="runbook-checkout",
         text=text,
         metadata=SourceMetadata(
             source="docs/runbooks/checkout.md",
-            document_type="runbook",
+            documentType="runbook",
             service="checkout",
             section="diagnosi",
         ),
     )
 
 
-def test_faiss_index_satisfies_persistent_vector_index_contract() -> None:
+def testFaissIndexSatisfiesPersistentVectorIndexContract() -> None:
     index = FaissVectorIndex(dimension=3)
 
     assert isinstance(index, PersistentVectorIndex)
-    assert index.dimension == 3
-    assert index.size == 0
+    assert index.getDimension() == 3
+    assert index.getSize() == 0
 
 
-def test_added_vectors_keep_the_same_positions_as_their_chunks() -> None:
+def testAddedVectorsKeepTheSamePositionsAsTheirChunks() -> None:
     index = FaissVectorIndex(dimension=3)
-    symptom = build_chunk(
+    symptom = buildChunk(
         "checkout-symptom",
         "Il servizio checkout restituisce HTTP 500.",
     )
-    action = build_chunk(
+    action = buildChunk(
         "checkout-action",
         "Controllare la raggiungibilità del servizio payment.",
     )
@@ -45,38 +45,38 @@ def test_added_vectors_keep_the_same_positions_as_their_chunks() -> None:
         [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
     )
 
-    assert index.size == 2
-    assert index.get_chunk(0) == symptom
-    assert index.get_chunk(1) == action
+    assert index.getSize() == 2
+    assert index.getChunk(0) == symptom
+    assert index.getChunk(1) == action
 
 
-def test_empty_batch_does_not_change_the_index() -> None:
+def testEmptyBatchDoesNotChangeTheIndex() -> None:
     index = FaissVectorIndex(dimension=3)
     index.add([], [])
 
-    assert index.size == 0
+    assert index.getSize() == 0
 
 
-def test_chunk_and_vector_counts_must_match() -> None:
+def testChunkAndVectorCountsMustMatch() -> None:
     index = FaissVectorIndex(dimension=3)
-    chunk = build_chunk("checkout-symptom", "Timeout verso il servizio payment.")
+    chunk = buildChunk("checkout-symptom", "Timeout verso il servizio payment.")
 
     with pytest.raises(ValueError, match="numero di chunk"):
         index.add([chunk], [])
 
 
-def test_vector_dimension_must_match_the_faiss_index() -> None:
+def testVectorDimensionMustMatchTheFaissIndex() -> None:
     index = FaissVectorIndex(dimension=3)
-    chunk = build_chunk("checkout-symptom", "Timeout verso il servizio payment.")
+    chunk = buildChunk("checkout-symptom", "Timeout verso il servizio payment.")
 
     with pytest.raises(ValueError, match="dimensione 3"):
         index.add([chunk], [[1.0, 0.0]])
 
 
-def test_duplicate_chunk_ids_are_rejected_before_indexing() -> None:
+def testDuplicateChunkIdsAreRejectedBeforeIndexing() -> None:
     index = FaissVectorIndex(dimension=3)
-    chunk = build_chunk("checkout-symptom", "Timeout verso il servizio payment.")
-    duplicate = build_chunk("checkout-symptom", "Errore di connessione a payment.")
+    chunk = buildChunk("checkout-symptom", "Timeout verso il servizio payment.")
+    duplicate = buildChunk("checkout-symptom", "Errore di connessione a payment.")
 
     with pytest.raises(ValueError, match="duplicati"):
         index.add(
@@ -84,35 +84,35 @@ def test_duplicate_chunk_ids_are_rejected_before_indexing() -> None:
             [[1.0, 0.0, 0.0], [0.9, 0.1, 0.0]],
         )
 
-    assert index.size == 0
+    assert index.getSize() == 0
 
 
-def test_a_chunk_cannot_be_added_twice_in_separate_batches() -> None:
+def testAChunkCannotBeAddedTwiceInSeparateBatches() -> None:
     index = FaissVectorIndex(dimension=3)
-    chunk = build_chunk("checkout-symptom", "Timeout verso il servizio payment.")
+    chunk = buildChunk("checkout-symptom", "Timeout verso il servizio payment.")
     index.add([chunk], [[1.0, 0.0, 0.0]])
 
     with pytest.raises(ValueError, match="già presenti"):
         index.add([chunk], [[1.0, 0.0, 0.0]])
 
-    assert index.size == 1
+    assert index.getSize() == 1
 
 
-def test_get_chunk_rejects_positions_outside_the_index() -> None:
+def testGetChunkRejectsPositionsOutsideTheIndex() -> None:
     index = FaissVectorIndex(dimension=3)
 
     with pytest.raises(IndexError):
-        index.get_chunk(0)
+        index.getChunk(0)
     with pytest.raises(IndexError):
-        index.get_chunk(-1)
+        index.getChunk(-1)
 
 
-def test_search_returns_positions_ordered_by_inner_product() -> None:
+def testSearchReturnsPositionsOrderedByInnerProduct() -> None:
     index = FaissVectorIndex(dimension=3)
     chunks = [
-        build_chunk("checkout-timeout", "Timeout durante il pagamento."),
-        build_chunk("cart-empty", "Il carrello risulta vuoto."),
-        build_chunk("payment-unreachable", "Il servizio payment non è raggiungibile."),
+        buildChunk("checkout-timeout", "Timeout durante il pagamento."),
+        buildChunk("cart-empty", "Il carrello risulta vuoto."),
+        buildChunk("payment-unreachable", "Il servizio payment non è raggiungibile."),
     ]
     index.add(
         chunks,
@@ -125,29 +125,29 @@ def test_search_returns_positions_ordered_by_inner_product() -> None:
     assert [score for _, score in matches] == pytest.approx([1.0, 0.8])
 
 
-def test_search_never_returns_empty_faiss_positions() -> None:
+def testSearchNeverReturnsEmptyFaissPositions() -> None:
     index = FaissVectorIndex(dimension=3)
-    chunk = build_chunk("checkout-timeout", "Timeout durante il pagamento.")
+    chunk = buildChunk("checkout-timeout", "Timeout durante il pagamento.")
     index.add([chunk], [[1.0, 0.0, 0.0]])
 
     assert index.search([1.0, 0.0, 0.0], k=5) == [(0, 1.0)]
 
 
 @pytest.mark.parametrize("k", [0, -1])
-def test_search_result_count_must_be_positive(k: int) -> None:
+def testSearchResultCountMustBePositive(k: int) -> None:
     index = FaissVectorIndex(dimension=3)
 
     with pytest.raises(ValueError, match="maggiore di zero"):
         index.search([1.0, 0.0, 0.0], k=k)
 
 
-def test_saved_index_can_be_loaded_without_losing_chunk_mapping(
+def testSavedIndexCanBeLoadedWithoutLosingChunkMapping(
     tmp_path: Path,
 ) -> None:
     index = FaissVectorIndex(dimension=3)
     chunks = [
-        build_chunk("checkout-symptom", "Il checkout restituisce HTTP 500."),
-        build_chunk("checkout-action", "Verificare il servizio payment."),
+        buildChunk("checkout-symptom", "Il checkout restituisce HTTP 500."),
+        buildChunk("checkout-action", "Verificare il servizio payment."),
     ]
     index.add(chunks, [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
 
@@ -156,29 +156,29 @@ def test_saved_index_can_be_loaded_without_losing_chunk_mapping(
 
     assert (tmp_path / "dense.index").is_file()
     assert (tmp_path / "chunks.json").is_file()
-    assert restored.dimension == 3
-    assert restored.size == 2
-    assert [restored.get_chunk(position) for position in range(restored.size)] == chunks
+    assert restored.getDimension() == 3
+    assert restored.getSize() == 2
+    assert [restored.getChunk(position) for position in range(restored.getSize())] == chunks
 
 
-def test_load_rejects_a_chunk_mapping_not_aligned_with_faiss(
+def testLoadRejectsAChunkMappingNotAlignedWithFaiss(
     tmp_path: Path,
 ) -> None:
     index = FaissVectorIndex(dimension=3)
-    chunk = build_chunk("checkout-symptom", "Il checkout restituisce HTTP 500.")
+    chunk = buildChunk("checkout-symptom", "Il checkout restituisce HTTP 500.")
     index.add([chunk], [[1.0, 0.0, 0.0]])
     index.save(tmp_path)
 
-    mapping_path = tmp_path / "chunks.json"
-    payload = json.loads(mapping_path.read_text(encoding="utf-8"))
+    mappingPath = tmp_path / "chunks.json"
+    payload = json.loads(mappingPath.read_text(encoding="utf-8"))
     payload["chunks"] = []
-    mapping_path.write_text(json.dumps(payload), encoding="utf-8")
+    mappingPath.write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.raises(ValueError, match="quantità diverse"):
         FaissVectorIndex.load(tmp_path)
 
 
 @pytest.mark.parametrize("dimension", [0, -1])
-def test_index_dimension_must_be_positive(dimension: int) -> None:
+def testIndexDimensionMustBePositive(dimension: int) -> None:
     with pytest.raises(ValueError, match="maggiore di zero"):
         FaissVectorIndex(dimension=dimension)

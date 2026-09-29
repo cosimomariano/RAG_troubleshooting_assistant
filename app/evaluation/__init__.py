@@ -12,7 +12,6 @@ from app.evaluation.experiment import (
     ExperimentMetrics,
     ExperimentRun,
     ExperimentRunner,
-    ExperimentSystem,
 )
 from app.evaluation.metrics import RetrievalMetricsCalculator
 from app.evaluation.persistence import ExperimentResultWriter
@@ -28,7 +27,6 @@ __all__ = [
     "ExperimentResultWriter",
     "ExperimentRun",
     "ExperimentRunner",
-    "ExperimentSystem",
     "GoldenCase",
     "GoldenCaseLoader",
     "RerankerExperimentConfiguration",

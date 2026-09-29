@@ -2,9 +2,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from math import isfinite
 from typing import Protocol
+
 from app.models import RetrievalResult
+from app.validation import RetrievalValidator
 
 TextPair = tuple[str, str]
+
 
 class CrossEncoderBackend(Protocol):
     def predict(
@@ -16,80 +19,74 @@ class CrossEncoderBackend(Protocol):
         convert_to_numpy: bool,
     ) -> Sequence[float]: ...
 
+
 @dataclass(frozen=True)
-class _ScoredCandidate:
+class ScoredCandidate:
     result: RetrievalResult
     score: float
-    original_order: int
+    originalOrder: int
+
 
 class CrossEncoderReranker:
     """Valuta congiuntamente la query e il testo di ogni chunk candidato."""
 
     def __init__(
         self,
-        model_name: str,
+        modelName: str,
         *,
-        batch_size: int = 32,
+        batchSize: int = 32,
         backend: CrossEncoderBackend | None = None,
     ) -> None:
-        self._model_name = self._validate_model_name(model_name)
-        self._batch_size = self._validate_batch_size(batch_size)
-        self._backend = self._resolve_backend(backend)
-
-    @property
-    def model_name(self) -> str:
-        return self._model_name
-
-    @property
-    def batch_size(self) -> int:
-        return self._batch_size
+        self.modelName = self.validateModelName(modelName)
+        self.batchSize = self.validateBatchSize(batchSize)
+        self.backend = self.resolveBackend(backend)
 
     def rerank(
         self,
         query: str,
         candidates: Sequence[RetrievalResult],
-        top_k: int,
+        topK: int,
     ) -> list[RetrievalResult]:
-        normalized_query = self._normalize_query(query)
-        final_top_k = self._validate_top_k(top_k)
-        candidate_list = list(candidates)
+        normalizedQuery = RetrievalValidator.normalizeQuery(query)
+        finalTopK = RetrievalValidator.validateTopK(topK)
+        candidateList = list(candidates)
 
-        if not candidate_list:
+        if not candidateList:
             return []
 
-        text_pairs = self._build_text_pairs(normalized_query, candidate_list)
-        scores = self._predict_scores(text_pairs)
-        scored_candidates = self._join_candidates_and_scores(candidate_list, scores)
-        ordered_candidates = self._sort_candidates(scored_candidates)
-        return self._build_results(ordered_candidates, final_top_k)
+        textPairs = self.buildTextPairs(normalizedQuery, candidateList)
+        scores = self.predictScores(textPairs)
+        scoredCandidates = self.joinCandidatesAndScores(candidateList, scores)
+        orderedCandidates = self.sortCandidates(scoredCandidates)
+        return self.buildResults(orderedCandidates, finalTopK)
 
-    def _predict_scores(self, text_pairs: list[TextPair]) -> list[float]:
-        raw_scores = self._backend.predict(
-            text_pairs,
-            batch_size=self._batch_size,
+    def predictScores(self, textPairs: list[TextPair]) -> list[float]:
+        rawScores = self.backend.predict(
+            textPairs,
+            batch_size=self.batchSize,
             show_progress_bar=False,
             convert_to_numpy=True,
         )
-        scores = self._convert_scores(raw_scores)
-        if len(scores) != len(text_pairs):
+        scores = self.convertScores(rawScores)
+        if len(scores) != len(textPairs):
             raise ValueError(
                 "Il numero di punteggi del Cross-Encoder non coincide con i candidati."
             )
         return scores
 
     @staticmethod
-    def _build_text_pairs(
+    def buildTextPairs(
         query: str,
         candidates: Sequence[RetrievalResult],
     ) -> list[TextPair]:
         return [(query, candidate.chunk.text) for candidate in candidates]
 
     @staticmethod
-    def _convert_scores(raw_scores: Sequence[float]) -> list[float]:
+    def convertScores(rawScores: Sequence[float]) -> list[float]:
         scores: list[float] = []
-        for raw_score in raw_scores:
+        for rawScore in rawScores:
             try:
-                score = float(raw_score)
+                score = float(rawScore)
             except (TypeError, ValueError) as error:
                 raise ValueError(
                     "Il Cross-Encoder deve restituire un punteggio numerico per candidato."
@@ -101,82 +98,69 @@ class CrossEncoderReranker:
         return scores
 
     @staticmethod
-    def _join_candidates_and_scores(
+    def joinCandidatesAndScores(
         candidates: Sequence[RetrievalResult],
         scores: Sequence[float],
-    ) -> list[_ScoredCandidate]:
+    ) -> list[ScoredCandidate]:
         return [
-            _ScoredCandidate(
+            ScoredCandidate(
                 result=candidate,
                 score=scores[index],
-                original_order=index,
+                originalOrder=index,
             )
             for index, candidate in enumerate(candidates)
         ]
 
     @staticmethod
-    def _sort_candidates(
-        candidates: Sequence[_ScoredCandidate],
-    ) -> list[_ScoredCandidate]:
+    def sortCandidates(
+        candidates: Sequence[ScoredCandidate],
+    ) -> list[ScoredCandidate]:
         return sorted(
             candidates,
-            key=lambda candidate: (-candidate.score, candidate.original_order),
+            key=lambda candidate: (-candidate.score, candidate.originalOrder),
         )
 
     @staticmethod
-    def _build_results(
-        candidates: Sequence[_ScoredCandidate],
-        top_k: int,
+    def buildResults(
+        candidates: Sequence[ScoredCandidate],
+        topK: int,
     ) -> list[RetrievalResult]:
         return [
             candidate.result.model_copy(
                 update={
                     "rank": rank,
-                    "reranker_score": candidate.score,
+                    "rerankerScore": candidate.score,
                 }
             )
-            for rank, candidate in enumerate(candidates[:top_k], start=1)
+            for rank, candidate in enumerate(candidates[:topK], start=1)
         ]
 
-    def _resolve_backend(
+    def resolveBackend(
         self,
         backend: CrossEncoderBackend | None,
     ) -> CrossEncoderBackend:
         if backend is not None:
             return backend
-        return self._load_backend(self._model_name)
+        return self.loadBackend(self.modelName)
 
     @staticmethod
-    def _load_backend(model_name: str) -> CrossEncoderBackend:
+    def loadBackend(modelName: str) -> CrossEncoderBackend:
         try:
             from sentence_transformers import CrossEncoder
         except ImportError as error:
             raise RuntimeError("Impossibile caricare Sentence Transformers.") from error
 
-        return CrossEncoder(model_name)
+        return CrossEncoder(modelName)
 
     @staticmethod
-    def _validate_model_name(model_name: str) -> str:
-        normalized_model_name = model_name.strip()
-        if not normalized_model_name:
+    def validateModelName(modelName: str) -> str:
+        normalizedModelName = modelName.strip()
+        if not normalizedModelName:
             raise ValueError("Il nome del modello Cross-Encoder non può essere vuoto.")
-        return normalized_model_name
+        return normalizedModelName
 
     @staticmethod
-    def _validate_batch_size(batch_size: int) -> int:
-        if batch_size <= 0:
+    def validateBatchSize(batchSize: int) -> int:
+        if batchSize <= 0:
             raise ValueError("La dimensione del batch deve essere maggiore di zero.")
-        return batch_size
-
-    @staticmethod
-    def _validate_top_k(top_k: int) -> int:
-        if top_k <= 0:
-            raise ValueError("Il valore Top-K deve essere maggiore di zero.")
-        return top_k
-
-    @staticmethod
-    def _normalize_query(query: str) -> str:
-        normalized_query = query.strip()
-        if not normalized_query:
-            raise ValueError("La query non può essere vuota.")
-        return normalized_query
+        return batchSize

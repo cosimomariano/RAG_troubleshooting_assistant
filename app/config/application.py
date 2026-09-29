@@ -4,9 +4,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
-import yaml
 from pydantic import Field, ValidationError
 
+from app.config.yaml_reader import YamlObjectReader
 from app.models import StrictModel
 from app.retrieval import RetrievalMode
 
@@ -30,18 +30,18 @@ class LoggingConfiguration(StrictModel):
 
 class LLMConfiguration(StrictModel):
     provider: Literal["ollama"] = Field(description="Provider del modello generativo")
-    base_url: str = Field(min_length=1, description="URL di base del server Ollama remoto")
+    baseUrl: str = Field(min_length=1, description="URL di base del server Ollama remoto")
     model: str = Field(min_length=1, description="Nome del modello esposto da Ollama")
-    timeout_seconds: float = Field(gt=0, description="Timeout della chiamata LLM in secondi")
+    timeoutSeconds: float = Field(gt=0, description="Timeout della chiamata LLM in secondi")
 
 
 class IngestionConfiguration(StrictModel):
-    knowledge_base_path: Path = Field(description="Percorso della Knowledge Base")
-    knowledge_base_version: str = Field(
+    knowledgeBasePath: Path = Field(description="Percorso della Knowledge Base")
+    knowledgeBaseVersion: str = Field(
         min_length=1,
         description="Versione logica della Knowledge Base",
     )
-    supported_extensions: tuple[str, ...] = Field(
+    supportedExtensions: tuple[str, ...] = Field(
         min_length=1,
         description="Estensioni documentali ammesse",
     )
@@ -50,11 +50,11 @@ class IngestionConfiguration(StrictModel):
 
 class ChunkingConfiguration(StrictModel):
     strategy: Literal["section_aware"] = Field(description="Strategia di chunking")
-    chunk_size_characters: int = Field(
+    chunkSizeCharacters: int = Field(
         gt=0,
         description="Dimensione massima del chunk in caratteri",
     )
-    chunk_overlap_characters: int = Field(
+    chunkOverlapCharacters: int = Field(
         ge=0,
         description="Sovrapposizione tra chunk consecutivi in caratteri",
     )
@@ -72,7 +72,7 @@ class EmbeddingConfiguration(StrictModel):
         description="Provider usato per calcolare gli embedding",
     )
     model: str = Field(min_length=1, description="Nome del modello bi-encoder")
-    batch_size: int = Field(gt=0, description="Numero di testi elaborati per batch")
+    batchSize: int = Field(gt=0, description="Numero di testi elaborati per batch")
     normalize: bool = Field(description="Abilita la normalizzazione degli embedding")
 
 
@@ -84,23 +84,23 @@ class VectorStoreConfiguration(StrictModel):
 
 class RetrievalConfiguration(StrictModel):
     mode: RetrievalMode = Field(description="Modalità di retrieval da eseguire")
-    top_k: int = Field(gt=0, description="Numero massimo di fonti restituite")
+    topK: int = Field(gt=0, description="Numero massimo di fonti restituite")
 
 
 class RerankerConfiguration(StrictModel):
     enabled: bool = Field(description="Abilita il secondo stadio di reranking")
     provider: Literal["cross_encoder"] = Field(description="Provider del reranker")
     model: str = Field(min_length=1, description="Nome del modello Cross-Encoder")
-    batch_size: int = Field(gt=0, description="Numero di coppie elaborate per batch")
-    candidate_top_n: int = Field(
+    batchSize: int = Field(gt=0, description="Numero di coppie elaborate per batch")
+    candidateTopN: int = Field(
         gt=0,
         description="Numero di candidati inviati al Cross-Encoder",
     )
 
 
 class EvaluationConfiguration(StrictModel):
-    dataset_path: Path = Field(description="Percorso del golden dataset")
-    results_path: Path = Field(description="Directory dei risultati sperimentali")
+    datasetPath: Path = Field(description="Percorso del golden dataset")
+    resultsPath: Path = Field(description="Directory dei risultati sperimentali")
 
 
 class ApplicationConfiguration(StrictModel):
@@ -112,7 +112,7 @@ class ApplicationConfiguration(StrictModel):
     chunking: ChunkingConfiguration
     masking: MaskingConfiguration
     embeddings: EmbeddingConfiguration
-    vector_store: VectorStoreConfiguration
+    vectorStore: VectorStoreConfiguration
     retrieval: RetrievalConfiguration
     reranker: RerankerConfiguration
     evaluation: EvaluationConfiguration
@@ -121,114 +121,104 @@ class ApplicationConfiguration(StrictModel):
 class EnvironmentFileLoader:
     """Legge un file .env senza modificare le variabili del processo."""
 
-    def load(self, environment_file: str | Path) -> dict[str, str]:
-        path = Path(environment_file)
+    def load(self, environmentFile: str | Path) -> dict[str, str]:
+        path = Path(environmentFile)
         if not path.is_file():
             raise FileNotFoundError(f"File delle variabili di ambiente non trovato: {path}")
 
         variables: dict[str, str] = {}
-        for line_number, line in enumerate(
+        for lineNumber, line in enumerate(
             path.read_text(encoding="utf-8").splitlines(),
             start=1,
         ):
-            parsed_entry = self._parse_line(line, line_number)
-            if parsed_entry is None:
+            parsedEntry = self.parseLine(line, lineNumber)
+            if parsedEntry is None:
                 continue
-            name, value = parsed_entry
+            name, value = parsedEntry
             variables[name] = value
         return variables
 
     @staticmethod
-    def _parse_line(line: str, line_number: int) -> tuple[str, str] | None:
-        normalized_line = line.strip()
-        if not normalized_line or normalized_line.startswith("#"):
+    def parseLine(line: str, lineNumber: int) -> tuple[str, str] | None:
+        normalizedLine = line.strip()
+        if not normalizedLine or normalizedLine.startswith("#"):
             return None
 
-        if normalized_line.startswith("export "):
-            normalized_line = normalized_line.removeprefix("export ").strip()
-        if "=" not in normalized_line:
-            raise ValueError(f"Riga {line_number} del file .env non valida.")
+        if normalizedLine.startswith("export "):
+            normalizedLine = normalizedLine.removeprefix("export ").strip()
+        if "=" not in normalizedLine:
+            raise ValueError(f"Riga {lineNumber} del file .env non valida.")
 
-        name, value = normalized_line.split("=", maxsplit=1)
-        normalized_name = name.strip()
-        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", normalized_name):
-            raise ValueError(f"Nome non valido alla riga {line_number} del file .env.")
+        name, value = normalizedLine.split("=", maxsplit=1)
+        normalizedName = name.strip()
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", normalizedName):
+            raise ValueError(f"Nome non valido alla riga {lineNumber} del file .env.")
 
-        normalized_value = value.strip()
-        if len(normalized_value) >= 2 and normalized_value[0] == normalized_value[-1]:
-            if normalized_value[0] in {"'", '"'}:
-                normalized_value = normalized_value[1:-1]
-        return normalized_name, normalized_value
+        normalizedValue = value.strip()
+        if len(normalizedValue) >= 2 and normalizedValue[0] == normalizedValue[-1]:
+            if normalizedValue[0] in {"'", '"'}:
+                normalizedValue = normalizedValue[1:-1]
+        return normalizedName, normalizedValue
 
 
 class ApplicationConfigurationLoader:
     """Carica il contratto YAML e risolve i riferimenti alle variabili d'ambiente."""
 
-    def __init__(self, environment_file_loader: EnvironmentFileLoader | None = None) -> None:
-        self._environment_file_loader = environment_file_loader or EnvironmentFileLoader()
+    def __init__(
+        self,
+        environmentFileLoader: EnvironmentFileLoader | None = None,
+        yamlObjectReader: YamlObjectReader | None = None,
+    ) -> None:
+        self.environmentFileLoader = environmentFileLoader or EnvironmentFileLoader()
+        self.yamlObjectReader = yamlObjectReader or YamlObjectReader()
 
     def load(
         self,
-        configuration_path: str | Path,
-        environment_file: str | Path | None = None,
+        configurationPath: str | Path,
+        environmentFile: str | Path | None = None,
         environment: Mapping[str, str] | None = None,
     ) -> ApplicationConfiguration:
-        path = Path(configuration_path)
-        if not path.is_file():
-            raise FileNotFoundError(f"Configurazione applicativa non trovata: {path}")
-
-        serialized_configuration = self._read_yaml(path)
-        variables = self._load_variables(environment_file, environment)
-        resolved_configuration = self._resolve_value(serialized_configuration, variables)
+        serializedConfiguration = self.yamlObjectReader.read(
+            configurationPath,
+            "applicativa",
+        )
+        variables = self.loadVariables(environmentFile, environment)
+        resolvedConfiguration = self.resolveValue(serializedConfiguration, variables)
 
         try:
-            return ApplicationConfiguration.model_validate(resolved_configuration)
+            return ApplicationConfiguration.model_validate(resolvedConfiguration)
         except ValidationError as error:
             raise ValueError("La configurazione applicativa non rispetta lo schema.") from error
 
-    @staticmethod
-    def _read_yaml(path: Path) -> dict[str, Any]:
-        try:
-            serialized_configuration = yaml.safe_load(path.read_text(encoding="utf-8"))
-        except yaml.YAMLError as error:
-            raise ValueError("La configurazione applicativa contiene YAML non valido.") from error
-
-        if not isinstance(serialized_configuration, dict):
-            raise ValueError("La configurazione applicativa deve essere un oggetto YAML.")
-        return serialized_configuration
-
-    def _load_variables(
+    def loadVariables(
         self,
-        environment_file: str | Path | None,
+        environmentFile: str | Path | None,
         environment: Mapping[str, str] | None,
     ) -> dict[str, str]:
         variables: dict[str, str] = {}
-        if environment_file is not None:
-            variables.update(self._environment_file_loader.load(environment_file))
+        if environmentFile is not None:
+            variables.update(self.environmentFileLoader.load(environmentFile))
 
-        process_environment = os.environ if environment is None else environment
-        variables.update(process_environment)
+        processEnvironment = os.environ if environment is None else environment
+        variables.update(processEnvironment)
         return variables
 
-    def _resolve_value(self, value: Any, variables: Mapping[str, str]) -> Any:
+    def resolveValue(self, value: Any, variables: Mapping[str, str]) -> Any:
         if isinstance(value, dict):
             return {
-                key: self._resolve_value(nested_value, variables)
-                for key, nested_value in value.items()
+                key: self.resolveValue(nestedValue, variables) for key, nestedValue in value.items()
             }
         if isinstance(value, list):
-            return [self._resolve_value(item, variables) for item in value]
+            return [self.resolveValue(item, variables) for item in value]
         if not isinstance(value, str):
             return value
 
-        reference_match = ENVIRONMENT_REFERENCE_PATTERN.fullmatch(value)
-        if reference_match is None:
+        referenceMatch = ENVIRONMENT_REFERENCE_PATTERN.fullmatch(value)
+        if referenceMatch is None:
             return value
 
-        variable_name = reference_match.group(1)
-        variable_value = variables.get(variable_name)
-        if variable_value is None or not variable_value.strip():
-            raise ValueError(
-                f"La variabile d'ambiente '{variable_name}' non è valorizzata."
-            )
-        return variable_value
+        variableName = referenceMatch.group(1)
+        variableValue = variables.get(variableName)
+        if variableValue is None or not variableValue.strip():
+            raise ValueError(f"La variabile d'ambiente '{variableName}' non è valorizzata.")
+        return variableValue

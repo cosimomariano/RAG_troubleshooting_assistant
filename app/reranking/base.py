@@ -1,6 +1,8 @@
 from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
+
 from app.models import RetrievalResult
+
 
 @runtime_checkable
 class Reranker(Protocol):
@@ -10,5 +12,5 @@ class Reranker(Protocol):
         self,
         query: str,
         candidates: Sequence[RetrievalResult],
-        top_k: int,
+        topK: int,
     ) -> list[RetrievalResult]: ...

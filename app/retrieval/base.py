@@ -16,10 +16,10 @@ class RetrievalExecution:
     """Risultati del retrieval e latenze misurate dai suoi stadi interni."""
 
     results: tuple[RetrievalResult, ...]
-    retrieval_latency_ms: float
-    reranking_latency_ms: float = 0.0
+    retrievalLatencyMs: float
+    rerankingLatencyMs: float = 0.0
 
 
 @runtime_checkable
 class MeasuredRetriever(Retriever, Protocol):
-    def retrieve_with_metrics(self, query: str, k: int) -> RetrievalExecution: ...
+    def retrieveWithMetrics(self, query: str, k: int) -> RetrievalExecution: ...

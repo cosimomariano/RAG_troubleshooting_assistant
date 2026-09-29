@@ -4,9 +4,10 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from app.api import TroubleshootingService, create_app
+from app.api import createApp
 from app.generation import LLMResponseError, LLMServiceUnavailableError
 from app.models import OperationalMetrics, RAGResponse, SourceReference, TokenUsage
+from app.services import TroubleshootingSystem
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -20,38 +21,38 @@ class RecordingTroubleshootingService:
     def troubleshoot(
         self,
         question: str,
-        incident_context: str | None = None,
+        incidentContext: str | None = None,
     ) -> RAGResponse:
-        self.calls.append((question, incident_context))
+        self.calls.append((question, incidentContext))
         return RAGResponse(
             answer="Il servizio payment non è raggiungibile dal checkout.",
             sources=[
                 SourceReference(
-                    citation_id="FONTE_1",
-                    document_id="document-payment-unreachable",
+                    citationId="FONTE_1",
+                    documentId="document-payment-unreachable",
                     source="runbooks/payment-unreachable.md",
-                    chunk_id="payment-unreachable-001",
-                    document_type="runbook",
+                    chunkId="payment-unreachable-001",
+                    documentType="runbook",
                     section="Diagnosi",
                     service="payment",
                     category="service-unavailable",
                     rank=1,
                     retriever="hybrid",
-                    fused_score=0.0328,
-                    reranker_score=4.82,
+                    fusedScore=0.0328,
+                    rerankerScore=4.82,
                 )
             ],
-            latency_ms=18.5,
-            operational_metrics=OperationalMetrics(
-                retrieval_latency_ms=3.0,
-                reranking_latency_ms=1.5,
-                prompt_build_latency_ms=0.5,
-                generation_latency_ms=12.0,
-                total_latency_ms=18.5,
-                token_usage=TokenUsage(
-                    input_tokens=120,
-                    output_tokens=30,
-                    total_tokens=150,
+            latencyMs=18.5,
+            operationalMetrics=OperationalMetrics(
+                retrievalLatencyMs=3.0,
+                rerankingLatencyMs=1.5,
+                promptBuildLatencyMs=0.5,
+                generationLatencyMs=12.0,
+                totalLatencyMs=18.5,
+                tokenUsage=TokenUsage(
+                    inputTokens=120,
+                    outputTokens=30,
+                    totalTokens=150,
                 ),
             ),
         )
@@ -59,19 +60,19 @@ class RecordingTroubleshootingService:
 
 class FailingTroubleshootingService:
     def __init__(self, exception: Exception) -> None:
-        self._exception = exception
+        self.exception = exception
 
     def troubleshoot(
         self,
         question: str,
-        incident_context: str | None = None,
+        incidentContext: str | None = None,
     ) -> RAGResponse:
-        raise self._exception
+        raise self.exception
 
 
-def test_api_accepts_normalized_telemetry_and_returns_sources() -> None:
+def testApiAcceptsNormalizedTelemetryAndReturnsSources() -> None:
     service = RecordingTroubleshootingService()
-    application = create_app(service)
+    application = createApp(service)
 
     with TestClient(application) as client:
         response = client.post(
@@ -146,21 +147,21 @@ def test_api_accepts_normalized_telemetry_and_returns_sources() -> None:
         },
     }
 
-    question, incident_context = service.calls[0]
+    question, incidentContext = service.calls[0]
     assert question == "Perché il checkout non completa il pagamento?"
-    assert incident_context is not None
-    assert "Contesto dichiarato: La fase di charge non viene completata." in incident_context
-    assert "Servizio principale: checkout" in incident_context
-    assert "Trace ID: trace-example-001" in incident_context
-    assert "Log: servizio=checkout" in incident_context
-    assert "Span: servizio=checkout" in incident_context
-    assert "Metrica: nome=request.duration" in incident_context
+    assert incidentContext is not None
+    assert "Contesto dichiarato: La fase di charge non viene completata." in incidentContext
+    assert "Servizio principale: checkout" in incidentContext
+    assert "Trace ID: trace-example-001" in incidentContext
+    assert "Log: servizio=checkout" in incidentContext
+    assert "Span: servizio=checkout" in incidentContext
+    assert "Metrica: nome=request.duration" in incidentContext
 
 
-def test_optional_incident_data_can_be_omitted() -> None:
+def testOptionalIncidentDataCanBeOmitted() -> None:
     service = RecordingTroubleshootingService()
 
-    with TestClient(create_app(service)) as client:
+    with TestClient(createApp(service)) as client:
         response = client.post(
             "/troubleshoot",
             json={"question": "Qual è la causa dell'errore?"},
@@ -195,8 +196,8 @@ def test_optional_incident_data_can_be_omitted() -> None:
         ),
     ],
 )
-def test_invalid_body_returns_the_contract_error(body: dict[str, object]) -> None:
-    with TestClient(create_app(RecordingTroubleshootingService())) as client:
+def testInvalidBodyReturnsTheContractError(body: dict[str, object]) -> None:
+    with TestClient(createApp(RecordingTroubleshootingService())) as client:
         response = client.post("/troubleshoot", json=body)
 
     assert response.status_code == 422
@@ -207,7 +208,7 @@ def test_invalid_body_returns_the_contract_error(body: dict[str, object]) -> Non
 
 
 @pytest.mark.parametrize(
-    ("exception", "expected_status", "expected_body"),
+    ("exception", "expectedStatus", "expectedBody"),
     [
         pytest.param(
             ValueError("Domanda vuota"),
@@ -235,22 +236,22 @@ def test_invalid_body_returns_the_contract_error(body: dict[str, object]) -> Non
         ),
     ],
 )
-def test_known_application_errors_are_mapped_to_contract_responses(
+def testKnownApplicationErrorsAreMappedToContractResponses(
     exception: Exception,
-    expected_status: int,
-    expected_body: dict[str, str],
+    expectedStatus: int,
+    expectedBody: dict[str, str],
 ) -> None:
-    application = create_app(FailingTroubleshootingService(exception))
+    application = createApp(FailingTroubleshootingService(exception))
 
     with TestClient(application) as client:
         response = client.post("/troubleshoot", json={"question": "Analizza l'incidente"})
 
-    assert response.status_code == expected_status
-    assert response.json() == expected_body
+    assert response.status_code == expectedStatus
+    assert response.json() == expectedBody
 
 
-def test_unexpected_error_returns_a_generic_internal_error() -> None:
-    application = create_app(FailingTroubleshootingService(RuntimeError("Errore simulato")))
+def testUnexpectedErrorReturnsAGenericInternalError() -> None:
+    application = createApp(FailingTroubleshootingService(RuntimeError("Errore simulato")))
 
     with TestClient(application, raise_server_exceptions=False) as client:
         response = client.post("/troubleshoot", json={"question": "Analizza l'incidente"})
@@ -262,21 +263,21 @@ def test_unexpected_error_returns_a_generic_internal_error() -> None:
     }
 
 
-def test_rag_service_shape_satisfies_the_controller_contract() -> None:
+def testRagServiceShapeSatisfiesTheControllerContract() -> None:
     service = RecordingTroubleshootingService()
 
-    assert isinstance(service, TroubleshootingService)
+    assert isinstance(service, TroubleshootingSystem)
 
 
-def test_generated_openapi_matches_the_public_contract_fields() -> None:
-    contract_path = PROJECT_ROOT / "contracts/openapi/troubleshooting-api.yaml"
-    public_contract = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
-    generated_contract = create_app(RecordingTroubleshootingService()).openapi()
+def testGeneratedOpenapiMatchesThePublicContractFields() -> None:
+    contractPath = PROJECT_ROOT / "contracts/openapi/troubleshooting-api.yaml"
+    publicContract = yaml.safe_load(contractPath.read_text(encoding="utf-8"))
+    generatedContract = createApp(RecordingTroubleshootingService()).openapi()
 
-    expected_schemas = public_contract["components"]["schemas"]
-    generated_schemas = generated_contract["components"]["schemas"]
+    expectedSchemas = publicContract["components"]["schemas"]
+    generatedSchemas = generatedContract["components"]["schemas"]
 
-    for schema_name in [
+    for schemaName in [
         "TroubleshootingRequest",
         "TelemetryContext",
         "LogEvidence",
@@ -288,16 +289,16 @@ def test_generated_openapi_matches_the_public_contract_fields() -> None:
         "SourceReference",
         "ErrorResponse",
     ]:
-        assert set(generated_schemas[schema_name]["properties"]) == set(
-            expected_schemas[schema_name]["properties"]
+        assert set(generatedSchemas[schemaName]["properties"]) == set(
+            expectedSchemas[schemaName]["properties"]
         )
-        assert set(generated_schemas[schema_name].get("required", [])) == set(
-            expected_schemas[schema_name].get("required", [])
+        assert set(generatedSchemas[schemaName].get("required", [])) == set(
+            expectedSchemas[schemaName].get("required", [])
         )
-        assert generated_schemas[schema_name]["additionalProperties"] is False
+        assert generatedSchemas[schemaName]["additionalProperties"] is False
 
-    generated_operation = generated_contract["paths"]["/troubleshoot"]["post"]
-    expected_operation = public_contract["paths"]["/troubleshoot"]["post"]
+    generatedOperation = generatedContract["paths"]["/troubleshoot"]["post"]
+    expectedOperation = publicContract["paths"]["/troubleshoot"]["post"]
 
-    assert generated_operation["operationId"] == expected_operation["operationId"]
-    assert set(generated_operation["responses"]) == set(expected_operation["responses"])
+    assert generatedOperation["operationId"] == expectedOperation["operationId"]
+    assert set(generatedOperation["responses"]) == set(expectedOperation["responses"])

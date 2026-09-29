@@ -8,90 +8,86 @@ from app.api.schemas import (
 
 class IncidentContextBuilder:
     def build(self, request: TroubleshootingRequest) -> str | None:
-        context_lines: list[str] = []
+        contextLines: list[str] = []
 
-        self._append_declared_context(context_lines, request.incident_context)
-        self._append_service(context_lines, request.service)
-        self._append_telemetry(context_lines, request)
+        self.appendDeclaredContext(contextLines, request.incidentContext)
+        self.appendService(contextLines, request.service)
+        self.appendTelemetry(contextLines, request)
 
-        if not context_lines:
+        if not contextLines:
             return None
-        return "\n".join(context_lines)
+        return "\n".join(contextLines)
 
     @staticmethod
-    def _append_declared_context(context_lines: list[str], incident_context: str | None) -> None:
-        if incident_context is None:
+    def appendDeclaredContext(contextLines: list[str], incidentContext: str | None) -> None:
+        if incidentContext is None:
             return
 
-        normalized_context = incident_context.strip()
-        if normalized_context:
-            context_lines.append(f"Contesto dichiarato: {normalized_context}")
+        normalizedContext = incidentContext.strip()
+        if normalizedContext:
+            contextLines.append(f"Contesto dichiarato: {normalizedContext}")
 
     @staticmethod
-    def _append_service(context_lines: list[str], service: str | None) -> None:
+    def appendService(contextLines: list[str], service: str | None) -> None:
         if service is None:
             return
 
-        normalized_service = service.strip()
-        if normalized_service:
-            context_lines.append(f"Servizio principale: {normalized_service}")
+        normalizedService = service.strip()
+        if normalizedService:
+            contextLines.append(f"Servizio principale: {normalizedService}")
 
-    def _append_telemetry(
+    def appendTelemetry(
         self,
-        context_lines: list[str],
+        contextLines: list[str],
         request: TroubleshootingRequest,
     ) -> None:
         telemetry = request.telemetry
         if telemetry is None:
             return
 
-        if telemetry.trace_id is not None:
-            normalized_trace_id = telemetry.trace_id.strip()
-            if normalized_trace_id:
-                context_lines.append(f"Trace ID: {normalized_trace_id}")
+        if telemetry.traceId is not None:
+            normalizedTraceId = telemetry.traceId.strip()
+            if normalizedTraceId:
+                contextLines.append(f"Trace ID: {normalizedTraceId}")
 
         for log in telemetry.logs:
-            context_lines.append(self._format_log(log))
+            contextLines.append(self.formatLog(log))
         for span in telemetry.spans:
-            context_lines.append(self._format_span(span))
+            contextLines.append(self.formatSpan(span))
         for metric in telemetry.metrics:
-            context_lines.append(self._format_metric(metric))
+            contextLines.append(self.formatMetric(metric))
 
     @staticmethod
-    def _format_log(log: LogEvidence) -> str:
+    def formatLog(log: LogEvidence) -> str:
         details = [f"servizio={log.service}", f"messaggio={log.message}"]
         if log.timestamp is not None:
             details.append(f"timestamp={log.timestamp.isoformat()}")
         if log.severity:
             details.append(f"severità={log.severity}")
-        if log.error_type:
-            details.append(f"tipo_errore={log.error_type}")
+        if log.errorType:
+            details.append(f"tipo_errore={log.errorType}")
         return f"Log: {', '.join(details)}"
 
     @staticmethod
-    def _format_span(span: SpanEvidence) -> str:
+    def formatSpan(span: SpanEvidence) -> str:
         details = [
             f"servizio={span.service}",
             f"operazione={span.operation}",
             f"stato={span.status}",
         ]
-        if span.span_id:
-            details.append(f"span_id={span.span_id}")
-        if span.peer_service:
-            details.append(f"servizio_remoto={span.peer_service}")
-        if span.error_message:
-            details.append(f"errore={span.error_message}")
+        if span.spanId:
+            details.append(f"span_id={span.spanId}")
+        if span.peerService:
+            details.append(f"servizio_remoto={span.peerService}")
+        if span.errorMessage:
+            details.append(f"errore={span.errorMessage}")
         return f"Span: {', '.join(details)}"
 
     @staticmethod
-    def _format_metric(metric: MetricEvidence) -> str:
+    def formatMetric(metric: MetricEvidence) -> str:
         details = [f"nome={metric.name}", f"valore={metric.value}"]
         if metric.service:
             details.append(f"servizio={metric.service}")
         if metric.unit:
             details.append(f"unità={metric.unit}")
         return f"Metrica: {', '.join(details)}"
-
-
-def build_incident_context(request: TroubleshootingRequest) -> str | None:
-    return IncidentContextBuilder().build(request)

@@ -5,7 +5,7 @@ from app.models.base import StrictModel
 
 class SourceMetadata(StrictModel):
     source: str = Field(min_length=1, description="Percorso/nome del file")
-    document_type: str = Field(
+    documentType: str = Field(
         min_length=1,
         description="Identificativo della tipologia associata alla fonte documentale",
     )
@@ -26,7 +26,7 @@ class Document(StrictModel):
 
 class DocumentChunk(StrictModel):
     id: str = Field(min_length=1, description="Identificativo univoco del chunk di riferimento")
-    document_id: str = Field(
+    documentId: str = Field(
         min_length=1,
         description="Identificativo del documento dal quale viene ricavato il chunk",
     )

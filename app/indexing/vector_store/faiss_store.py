@@ -9,6 +9,7 @@ import numpy as np
 from app.indexing.embeddings import EmbeddingVector
 from app.indexing.vector_store.base import VectorSearchMatch
 from app.models import DocumentChunk
+from app.validation import RetrievalValidator
 
 _INDEX_FILE_NAME = "dense.index"
 _CHUNKS_FILE_NAME = "chunks.json"
@@ -18,138 +19,136 @@ _METRIC_NAME = "inner_product"
 
 class FaissVectorIndex:
     def __init__(self, dimension: int) -> None:
-        self._validate_dimension(dimension)
-        self._index = faiss.IndexFlatIP(dimension)
-        self._chunks: list[DocumentChunk] = []
+        self.validateDimension(dimension)
+        self.index = faiss.IndexFlatIP(dimension)
+        self.chunks: list[DocumentChunk] = []
 
-    @property
-    def dimension(self) -> int:
-        return int(self._index.d)
+    def getDimension(self) -> int:
+        return int(self.index.d)
 
-    @property
-    def size(self) -> int:
-        return int(self._index.ntotal)
+    def getSize(self) -> int:
+        return int(self.index.ntotal)
 
     def add(
         self,
         chunks: Sequence[DocumentChunk],
         vectors: Sequence[EmbeddingVector],
     ) -> None:
-        chunk_batch = list(chunks)
-        vector_batch = list(vectors)
+        chunkBatch = list(chunks)
+        vectorBatch = list(vectors)
 
-        self._validate_batch_sizes(chunk_batch, vector_batch)
-        if not chunk_batch:
+        self.validateBatchSizes(chunkBatch, vectorBatch)
+        if not chunkBatch:
             return
 
-        self._validate_chunk_ids(chunk_batch)
-        vector_matrix = self._create_vector_matrix(vector_batch)
-        self._validate_vector_matrix(vector_matrix)
+        self.validateChunkIds(chunkBatch)
+        vectorMatrix = self.createVectorMatrix(vectorBatch)
+        self.validateVectorMatrix(vectorMatrix)
 
-        self._index.add(np.ascontiguousarray(vector_matrix))
-        self._chunks.extend(chunk_batch)
-        self._validate_alignment()
+        self.index.add(np.ascontiguousarray(vectorMatrix))
+        self.chunks.extend(chunkBatch)
+        self.validateAlignment()
 
-    def get_chunk(self, position: int) -> DocumentChunk:
-        self._validate_chunk_position(position)
-        return self._chunks[position]
+    def getChunk(self, position: int) -> DocumentChunk:
+        self.validateChunkPosition(position)
+        return self.chunks[position]
 
     def search(self, vector: EmbeddingVector, k: int) -> list[VectorSearchMatch]:
-        self._validate_result_count(k)
-        if self.size == 0:
+        RetrievalValidator.validateTopK(k, "k")
+        if self.getSize() == 0:
             return []
 
-        query_matrix = self._create_query_matrix(vector)
-        result_count = min(k, self.size)
-        scores, positions = self._index.search(query_matrix, result_count)
-        return self._map_search_results(positions[0], scores[0])
+        queryMatrix = self.createQueryMatrix(vector)
+        resultCount = min(k, self.getSize())
+        scores, positions = self.index.search(queryMatrix, resultCount)
+        return self.mapSearchResults(positions[0], scores[0])
 
-    def save(self, directory_path: Path) -> None:
-        self._validate_alignment()
-        directory_path.mkdir(parents=True, exist_ok=True)
+    def save(self, directoryPath: Path) -> None:
+        self.validateAlignment()
+        directoryPath.mkdir(parents=True, exist_ok=True)
 
-        index_path, chunks_path = self._build_storage_paths(directory_path)
-        faiss.write_index(self._index, str(index_path))
-        chunks_path.write_text(
-            json.dumps(self._build_payload(), ensure_ascii=False, indent=2),
+        indexPath, chunksPath = self.buildStoragePaths(directoryPath)
+        faiss.write_index(self.index, str(indexPath))
+        chunksPath.write_text(
+            json.dumps(self.buildPayload(), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
 
     @classmethod
-    def load(cls, directory_path: Path) -> "FaissVectorIndex":
-        index_path, chunks_path = cls._build_storage_paths(directory_path)
-        cls._validate_storage_files(index_path, chunks_path)
+    def load(cls, directoryPath: Path) -> "FaissVectorIndex":
+        indexPath, chunksPath = cls.buildStoragePaths(directoryPath)
+        cls.validateStorageFiles(indexPath, chunksPath)
 
-        stored_index = faiss.read_index(str(index_path))
-        payload = cls._read_payload(chunks_path)
-        cls._validate_payload(payload, int(stored_index.d))
+        storedIndex = faiss.read_index(str(indexPath))
+        payload = cls.readPayload(chunksPath)
+        cls.validatePayload(payload, int(storedIndex.d))
 
-        instance = cls(dimension=int(stored_index.d))
-        instance._index = stored_index
-        instance._chunks = cls._deserialize_chunks(payload)
-        instance._validate_alignment()
+        instance = cls(dimension=int(storedIndex.d))
+        instance.index = storedIndex
+        instance.chunks = cls.deserializeChunks(payload)
+        instance.validateAlignment()
         return instance
 
-    def _build_payload(self) -> dict[str, Any]:
-        serialized_chunks: list[dict[str, Any]] = []
-        for chunk in self._chunks:
-            serialized_chunks.append(chunk.model_dump(mode="json"))
+    def buildPayload(self) -> dict[str, Any]:
+        serializedChunks: list[dict[str, Any]] = []
+        for chunk in self.chunks:
+            serializedChunks.append(chunk.model_dump(mode="json"))
 
         return {
             "schema_version": _SCHEMA_VERSION,
             "metric": _METRIC_NAME,
-            "dimension": self.dimension,
-            "chunks": serialized_chunks,
+            "dimension": self.getDimension(),
+            "chunks": serializedChunks,
         }
 
-    def _validate_chunk_ids(self, chunks: list[DocumentChunk]) -> None:
-        new_chunk_ids = [chunk.id for chunk in chunks]
-        if len(new_chunk_ids) != len(set(new_chunk_ids)):
+    def validateChunkIds(self, chunks: list[DocumentChunk]) -> None:
+        newChunkIds = [chunk.id for chunk in chunks]
+        if len(newChunkIds) != len(set(newChunkIds)):
             raise ValueError("Il batch contiene identificativi di chunk duplicati.")
 
-        stored_chunk_ids = {chunk.id for chunk in self._chunks}
-        if stored_chunk_ids.intersection(new_chunk_ids):
+        storedChunkIds = {chunk.id for chunk in self.chunks}
+        if storedChunkIds.intersection(newChunkIds):
             raise ValueError("Uno o più chunk sono già presenti nell'indice.")
 
-    def _validate_vector_matrix(self, vector_matrix: np.ndarray) -> None:
-        if vector_matrix.ndim != 2 or vector_matrix.shape[1] != self.dimension:
+    def validateVectorMatrix(self, vectorMatrix: np.ndarray) -> None:
+        if vectorMatrix.ndim != 2 or vectorMatrix.shape[1] != self.getDimension():
             raise ValueError(
-                f"Ogni vettore deve avere dimensione {self.dimension}; "
-                f"forma ricevuta: {vector_matrix.shape}."
+                f"Ogni vettore deve avere dimensione {self.getDimension()}; "
+                f"forma ricevuta: {vectorMatrix.shape}."
             )
 
-    def _validate_chunk_position(self, position: int) -> None:
-        if position < 0 or position >= self.size:
+    def validateChunkPosition(self, position: int) -> None:
+        if position < 0 or position >= self.getSize():
             raise IndexError("La posizione richiesta non esiste nell'indice.")
 
-    def _validate_alignment(self) -> None:
-        if self.size != len(self._chunks):
+    def validateAlignment(self) -> None:
+        if self.getSize() != len(self.chunks):
             raise ValueError("L'indice FAISS e la mappatura dei chunk contengono quantità diverse.")
 
     @staticmethod
-    def _create_vector_matrix(vectors: list[EmbeddingVector]) -> np.ndarray:
+    def createVectorMatrix(vectors: list[EmbeddingVector]) -> np.ndarray:
         try:
             return np.asarray(vectors, dtype=np.float32)
         except (TypeError, ValueError) as error:
             raise ValueError("I vettori devono formare una matrice numerica regolare.") from error
 
-    def _create_query_matrix(self, vector: EmbeddingVector) -> np.ndarray:
+    def createQueryMatrix(self, vector: EmbeddingVector) -> np.ndarray:
         try:
-            query_matrix = np.asarray([vector], dtype=np.float32)
+            queryMatrix = np.asarray([vector], dtype=np.float32)
         except (TypeError, ValueError) as error:
             raise ValueError("Il vettore di ricerca deve contenere valori numerici.") from error
 
-        if query_matrix.ndim != 2 or query_matrix.shape[1] != self.dimension:
+        if queryMatrix.ndim != 2 or queryMatrix.shape[1] != self.getDimension():
             raise ValueError(
-                f"Il vettore di ricerca deve avere dimensione {self.dimension}; "
-                f"forma ricevuta: {query_matrix.shape}."
+                f"Il vettore di ricerca deve avere dimensione {self.getDimension()}; "
+                f"forma ricevuta: {queryMatrix.shape}."
             )
-        if not np.isfinite(query_matrix).all():
+        if not np.isfinite(queryMatrix).all():
             raise ValueError("Il vettore di ricerca contiene valori non finiti.")
-        return np.ascontiguousarray(query_matrix)
+        return np.ascontiguousarray(queryMatrix)
 
     @staticmethod
-    def _map_search_results(
+    def mapSearchResults(
         positions: np.ndarray,
         scores: np.ndarray,
     ) -> list[VectorSearchMatch]:
@@ -161,12 +160,12 @@ class FaissVectorIndex:
         return matches
 
     @staticmethod
-    def _validate_dimension(dimension: int) -> None:
+    def validateDimension(dimension: int) -> None:
         if dimension <= 0:
             raise ValueError("La dimensione dei vettori deve essere maggiore di zero.")
 
     @staticmethod
-    def _validate_batch_sizes(
+    def validateBatchSizes(
         chunks: list[DocumentChunk],
         vectors: list[EmbeddingVector],
     ) -> None:
@@ -174,28 +173,23 @@ class FaissVectorIndex:
             raise ValueError("Il numero di chunk deve coincidere con quello dei vettori.")
 
     @staticmethod
-    def _validate_result_count(result_count: int) -> None:
-        if result_count <= 0:
-            raise ValueError("Il numero di risultati deve essere maggiore di zero.")
-
-    @staticmethod
-    def _build_storage_paths(directory_path: Path) -> tuple[Path, Path]:
+    def buildStoragePaths(directoryPath: Path) -> tuple[Path, Path]:
         return (
-            directory_path / _INDEX_FILE_NAME,
-            directory_path / _CHUNKS_FILE_NAME,
+            directoryPath / _INDEX_FILE_NAME,
+            directoryPath / _CHUNKS_FILE_NAME,
         )
 
     @staticmethod
-    def _validate_storage_files(index_path: Path, chunks_path: Path) -> None:
-        if not index_path.is_file() or not chunks_path.is_file():
+    def validateStorageFiles(indexPath: Path, chunksPath: Path) -> None:
+        if not indexPath.is_file() or not chunksPath.is_file():
             raise FileNotFoundError(
                 "La directory non contiene un indice FAISS e la relativa mappatura."
             )
 
     @staticmethod
-    def _read_payload(chunks_path: Path) -> dict[str, Any]:
+    def readPayload(chunksPath: Path) -> dict[str, Any]:
         try:
-            payload = json.loads(chunks_path.read_text(encoding="utf-8"))
+            payload = json.loads(chunksPath.read_text(encoding="utf-8"))
         except json.JSONDecodeError as error:
             raise ValueError("La mappatura dei chunk non contiene JSON valido.") from error
 
@@ -204,17 +198,17 @@ class FaissVectorIndex:
         return payload
 
     @staticmethod
-    def _validate_payload(payload: dict[str, Any], index_dimension: int) -> None:
+    def validatePayload(payload: dict[str, Any], indexDimension: int) -> None:
         if payload.get("schema_version") != _SCHEMA_VERSION:
             raise ValueError("La versione del formato persistito non è supportata.")
         if payload.get("metric") != _METRIC_NAME:
             raise ValueError("La metrica dell'indice persistito non è supportata.")
-        if payload.get("dimension") != index_dimension:
+        if payload.get("dimension") != indexDimension:
             raise ValueError("La dimensione salvata non coincide con quella dell'indice FAISS.")
         if not isinstance(payload.get("chunks"), list):
             raise ValueError("La mappatura dei chunk persistita non è valida.")
 
     @staticmethod
-    def _deserialize_chunks(payload: dict[str, Any]) -> list[DocumentChunk]:
-        raw_chunks = payload["chunks"]
-        return [DocumentChunk.model_validate(raw_chunk) for raw_chunk in raw_chunks]
+    def deserializeChunks(payload: dict[str, Any]) -> list[DocumentChunk]:
+        rawChunks = payload["chunks"]
+        return [DocumentChunk.model_validate(rawChunk) for rawChunk in rawChunks]

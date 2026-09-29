@@ -33,23 +33,23 @@ class RecordingEncoder:
         return self.vectors if self.vectors is not None else []
 
 
-def test_sentence_transformer_adapter_respects_embedding_contract() -> None:
+def testSentenceTransformerAdapterRespectsEmbeddingContract() -> None:
     model = SentenceTransformerEmbeddingModel(
         "test-bi-encoder",
         backend=RecordingEncoder(),
     )
 
     assert isinstance(model, EmbeddingModel)
-    assert model.model_name == "test-bi-encoder"
+    assert model.modelName == "test-bi-encoder"
 
 
-def test_runbook_chunks_are_sent_to_backend_as_a_single_batch() -> None:
-    expected_vectors = [[0.12, 0.98], [0.87, 0.14]]
-    backend = RecordingEncoder(vectors=expected_vectors)
+def testRunbookChunksAreSentToBackendAsASingleBatch() -> None:
+    expectedVectors = [[0.12, 0.98], [0.87, 0.14]]
+    backend = RecordingEncoder(vectors=expectedVectors)
     model = SentenceTransformerEmbeddingModel(
         "test-bi-encoder",
-        batch_size=8,
-        normalize_embeddings=True,
+        batchSize=8,
+        normalizeEmbeddings=True,
         backend=backend,
     )
     chunks = [
@@ -59,7 +59,7 @@ def test_runbook_chunks_are_sent_to_backend_as_a_single_batch() -> None:
 
     vectors = model.encode(chunks)
 
-    assert vectors == expected_vectors
+    assert vectors == expectedVectors
     assert backend.calls == [
         {
             "sentences": chunks,
@@ -71,11 +71,11 @@ def test_runbook_chunks_are_sent_to_backend_as_a_single_batch() -> None:
     ]
 
 
-def test_normalization_can_be_disabled_for_embedding_experiments() -> None:
+def testNormalizationCanBeDisabledForEmbeddingExperiments() -> None:
     backend = RecordingEncoder(vectors=[[0.4, 0.6]])
     model = SentenceTransformerEmbeddingModel(
         "test-bi-encoder",
-        normalize_embeddings=False,
+        normalizeEmbeddings=False,
         backend=backend,
     )
 
@@ -84,7 +84,7 @@ def test_normalization_can_be_disabled_for_embedding_experiments() -> None:
     assert backend.calls[0]["normalize_embeddings"] is False
 
 
-def test_empty_chunk_collection_skips_model_inference() -> None:
+def testEmptyChunkCollectionSkipsModelInference() -> None:
     backend = RecordingEncoder()
     model = SentenceTransformerEmbeddingModel(
         "test-bi-encoder",
@@ -96,7 +96,7 @@ def test_empty_chunk_collection_skips_model_inference() -> None:
 
 
 @pytest.mark.parametrize(
-    ("model_name", "batch_size"),
+    ("modelName", "batch_size"),
     [
         pytest.param("", 32, id="nome-modello-vuoto"),
         pytest.param("   ", 32, id="nome-modello-con-soli-spazi"),
@@ -104,19 +104,19 @@ def test_empty_chunk_collection_skips_model_inference() -> None:
         pytest.param("test-bi-encoder", -1, id="batch-size-negativo"),
     ],
 )
-def test_invalid_embedding_configuration_is_rejected(
-    model_name: str,
+def testInvalidEmbeddingConfigurationIsRejected(
+    modelName: str,
     batch_size: int,
 ) -> None:
     with pytest.raises(ValueError):
         SentenceTransformerEmbeddingModel(
-            model_name,
-            batch_size=batch_size,
+            modelName,
+            batchSize=batch_size,
             backend=RecordingEncoder(),
         )
 
 
-def test_backend_cannot_drop_a_chunk_from_the_batch() -> None:
+def testBackendCannotDropAChunkFromTheBatch() -> None:
     backend = RecordingEncoder(vectors=[[0.2, 0.8]])
     model = SentenceTransformerEmbeddingModel(
         "test-bi-encoder",

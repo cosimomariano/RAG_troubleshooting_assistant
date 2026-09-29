@@ -4,8 +4,8 @@ from pathlib import Path
 
 from app.bootstrap import RAGApplicationFactory
 from app.cli.common import (
-    add_application_configuration_arguments,
-    load_application_configuration,
+    addApplicationConfigurationArguments,
+    loadApplicationConfiguration,
 )
 from app.config import ApplicationConfiguration
 from app.evaluation import (
@@ -19,79 +19,74 @@ from app.evaluation import (
 from app.retrieval import RetrievalMode
 
 
-def build_argument_parser() -> ArgumentParser:
+def buildArgumentParser() -> ArgumentParser:
     parser = ArgumentParser(
         description="Esegue una configurazione sperimentale sul golden dataset.",
     )
     parser.add_argument(
         "--experiment-config",
+        dest="experimentConfig",
         type=Path,
         required=True,
         help="Percorso della configurazione sperimentale da eseguire.",
     )
-    add_application_configuration_arguments(parser)
+    addApplicationConfigurationArguments(parser)
     return parser
 
 
 def main() -> None:
-    arguments = build_argument_parser().parse_args()
-    application_configuration = load_application_configuration(arguments)
-    experiment_configuration = ExperimentConfigurationLoader().load(
-        arguments.experiment_config
+    arguments = buildArgumentParser().parse_args()
+    applicationConfiguration = loadApplicationConfiguration(arguments)
+    experimentConfiguration = ExperimentConfigurationLoader().load(arguments.experimentConfig)
+
+    ragService = RAGApplicationFactory(applicationConfiguration).createRagService(
+        retrievalMode=experimentConfiguration.retrieval.mode,
+        rerankerEnabled=experimentConfiguration.reranker.enabled,
+    )
+    goldenCases = GoldenCaseLoader().load(applicationConfiguration.evaluation.datasetPath)
+    metadata = buildExperimentMetadata(
+        applicationConfiguration,
+        experimentConfiguration,
+    )
+    experimentRun = ExperimentRunner(
+        system=ragService,
+        topK=applicationConfiguration.retrieval.topK,
+    ).execute(experimentConfiguration, goldenCases, metadata)
+    outputDirectory = ExperimentResultWriter().save(
+        experimentRun,
+        applicationConfiguration.evaluation.resultsPath,
     )
 
-    rag_service = RAGApplicationFactory(application_configuration).create_rag_service(
-        retrieval_mode=experiment_configuration.retrieval.mode,
-        reranker_enabled=experiment_configuration.reranker.enabled,
-    )
-    golden_cases = GoldenCaseLoader().load(
-        application_configuration.evaluation.dataset_path
-    )
-    metadata = build_experiment_metadata(
-        application_configuration,
-        experiment_configuration,
-    )
-    experiment_run = ExperimentRunner(
-        system=rag_service,
-        top_k=application_configuration.retrieval.top_k,
-    ).execute(experiment_configuration, golden_cases, metadata)
-    output_directory = ExperimentResultWriter().save(
-        experiment_run,
-        application_configuration.evaluation.results_path,
-    )
-
-    print(f"Esperimento completato: {experiment_run.run_id}")
-    print(f"Recall@K medio: {experiment_run.metrics.mean_recall_at_k:.4f}")
-    print(f"Mean Reciprocal Rank: {experiment_run.metrics.mean_reciprocal_rank:.4f}")
-    print(f"Risultati salvati in: {output_directory}")
+    print(f"Esperimento completato: {experimentRun.runId}")
+    print(f"Recall@K medio: {experimentRun.metrics.meanRecallAtK:.4f}")
+    print(f"Mean Reciprocal Rank: {experimentRun.metrics.meanReciprocalRank:.4f}")
+    print(f"Risultati salvati in: {outputDirectory}")
 
 
-def build_experiment_metadata(
-    application_configuration: ApplicationConfiguration,
-    experiment_configuration: ExperimentConfiguration,
+def buildExperimentMetadata(
+    applicationConfiguration: ApplicationConfiguration,
+    experimentConfiguration: ExperimentConfiguration,
 ) -> ExperimentMetadata:
-    model_identifiers = {
-        "generator": application_configuration.llm.model,
+    modelIdentifiers = {
+        "generator": applicationConfiguration.llm.model,
     }
-    retrieval_mode = experiment_configuration.retrieval.mode
-    if retrieval_mode in {RetrievalMode.DENSE, RetrievalMode.HYBRID}:
-        model_identifiers["embedding"] = application_configuration.embeddings.model
-    if experiment_configuration.reranker.enabled:
-        model_identifiers["reranker"] = application_configuration.reranker.model
+    retrievalMode = experimentConfiguration.retrieval.mode
+    if retrievalMode in {RetrievalMode.DENSE, RetrievalMode.HYBRID}:
+        modelIdentifiers["embedding"] = applicationConfiguration.embeddings.model
+    if experimentConfiguration.reranker.enabled:
+        modelIdentifiers["reranker"] = applicationConfiguration.reranker.model
 
     return ExperimentMetadata(
-        dataset_path=application_configuration.evaluation.dataset_path.as_posix(),
-        knowledge_base_version=(
-            application_configuration.ingestion.knowledge_base_version
-        ),
-        git_commit=read_git_commit(),
-        model_identifiers=model_identifiers,
+        datasetPath=applicationConfiguration.evaluation.datasetPath.as_posix(),
+        knowledgeBaseVersion=(applicationConfiguration.ingestion.knowledgeBaseVersion),
+        gitCommit=readGitCommit(),
+        modelIdentifiers=modelIdentifiers,
     )
 
 
-def read_git_commit() -> str | None:
+def readGitCommit() -> str | None:
     try:
-        completed_process = subprocess.run(
+        completedProcess = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             check=False,
             capture_output=True,
@@ -100,10 +95,10 @@ def read_git_commit() -> str | None:
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return None
-    if completed_process.returncode != 0:
+    if completedProcess.returncode != 0:
         return None
 
-    commit = completed_process.stdout.strip()
+    commit = completedProcess.stdout.strip()
     return commit or None
 
 

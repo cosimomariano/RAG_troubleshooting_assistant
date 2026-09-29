@@ -2,46 +2,49 @@ from app.indexing import BM25SparseIndex
 from app.models import DocumentChunk, SourceMetadata
 from app.retrieval import Retriever, SparseRetriever
 
-def build_chunk(chunk_id: str, text: str) -> DocumentChunk:
+
+def buildChunk(chunkId: str, text: str) -> DocumentChunk:
     return DocumentChunk(
-        id=chunk_id,
-        document_id="runbook-payment",
+        id=chunkId,
+        documentId="runbook-payment",
         text=text,
         metadata=SourceMetadata(
             source="knowledge_base/runbooks/payment.md",
-            document_type="runbook",
+            documentType="runbook",
             service="payment",
             section="diagnosi",
         ),
     )
 
-def build_sparse_retriever() -> SparseRetriever:
-    sparse_index = BM25SparseIndex(
+
+def buildSparseRetriever() -> SparseRetriever:
+    sparseIndex = BM25SparseIndex(
         [
-            build_chunk(
+            buildChunk(
                 "payment-unreachable",
                 "Connection refused durante la chiamata payment/charge.",
             ),
-            build_chunk(
+            buildChunk(
                 "cart-empty",
                 "Il carrello non contiene prodotti.",
             ),
-            build_chunk(
+            buildChunk(
                 "payment-timeout",
                 "Timeout del servizio payment.",
             ),
         ]
     )
-    return SparseRetriever(sparse_index)
+    return SparseRetriever(sparseIndex)
 
-def test_sparse_retriever_satisfies_common_retriever_contract() -> None:
-    retriever = build_sparse_retriever()
+
+def testSparseRetrieverSatisfiesCommonRetrieverContract() -> None:
+    retriever = buildSparseRetriever()
 
     assert isinstance(retriever, Retriever)
 
 
-def test_sparse_retriever_returns_common_retrieval_results() -> None:
-    retriever = build_sparse_retriever()
+def testSparseRetrieverReturnsCommonRetrievalResults() -> None:
+    retriever = buildSparseRetriever()
 
     results = retriever.retrieve("connection refused payment/charge", k=2)
 

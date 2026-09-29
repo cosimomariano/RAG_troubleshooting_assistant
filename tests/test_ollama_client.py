@@ -7,7 +7,6 @@ from app.generation import (
     LLMClient,
     LLMResponseError,
     LLMServiceUnavailableError,
-    MeasuredLLMClient,
     OllamaLLMClient,
 )
 
@@ -16,25 +15,25 @@ OLLAMA_MODEL = "modello-test"
 TIMEOUT_SECONDS = 30
 
 
-def build_client(transport: httpx.MockTransport) -> tuple[OllamaLLMClient, httpx.Client]:
+def buildClient(transport: httpx.MockTransport) -> tuple[OllamaLLMClient, httpx.Client]:
     """Crea un client Ollama che usa un trasporto HTTP simulato."""
 
-    http_client = httpx.Client(transport=transport)
-    ollama_client = OllamaLLMClient(
-        base_url=OLLAMA_URL,
+    httpClient = httpx.Client(transport=transport)
+    ollamaClient = OllamaLLMClient(
+        baseUrl=OLLAMA_URL,
         model=OLLAMA_MODEL,
-        timeout_seconds=TIMEOUT_SECONDS,
-        http_client=http_client,
+        timeoutSeconds=TIMEOUT_SECONDS,
+        httpClient=httpClient,
     )
-    return ollama_client, http_client
+    return ollamaClient, httpClient
 
 
-def test_generate_sends_the_prompt_and_returns_ollama_text() -> None:
-    received_request: httpx.Request | None = None
+def testGenerateSendsThePromptAndReturnsOllamaText() -> None:
+    receivedRequest: httpx.Request | None = None
 
-    def handle_request(request: httpx.Request) -> httpx.Response:
-        nonlocal received_request
-        received_request = request
+    def handleRequest(request: httpx.Request) -> httpx.Response:
+        nonlocal receivedRequest
+        receivedRequest = request
         return httpx.Response(
             200,
             json={
@@ -43,23 +42,23 @@ def test_generate_sends_the_prompt_and_returns_ollama_text() -> None:
             },
         )
 
-    ollama_client, http_client = build_client(httpx.MockTransport(handle_request))
-    with http_client:
-        answer = ollama_client.generate("Analizza il timeout del servizio checkout.")
+    ollamaClient, httpClient = buildClient(httpx.MockTransport(handleRequest))
+    with httpClient:
+        answer = ollamaClient.generate("Analizza il timeout del servizio checkout.")
 
-    assert isinstance(ollama_client, LLMClient)
+    assert isinstance(ollamaClient, LLMClient)
     assert answer == "Verificare la disponibilità del servizio payment."
-    assert received_request is not None
-    assert str(received_request.url) == f"{OLLAMA_URL}/api/generate"
-    assert json.loads(received_request.content) == {
+    assert receivedRequest is not None
+    assert str(receivedRequest.url) == f"{OLLAMA_URL}/api/generate"
+    assert json.loads(receivedRequest.content) == {
         "model": OLLAMA_MODEL,
         "prompt": "Analizza il timeout del servizio checkout.",
         "stream": False,
     }
 
 
-def test_generate_with_metrics_maps_ollama_token_counts() -> None:
-    def handle_request(request: httpx.Request) -> httpx.Response:
+def testGenerateWithMetricsMapsOllamaTokenCounts() -> None:
+    def handleRequest(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
             json={
@@ -70,60 +69,60 @@ def test_generate_with_metrics_maps_ollama_token_counts() -> None:
             },
         )
 
-    ollama_client, http_client = build_client(httpx.MockTransport(handle_request))
-    with http_client:
-        result = ollama_client.generate_with_metrics("Analizza l'incidente.")
+    ollamaClient, httpClient = buildClient(httpx.MockTransport(handleRequest))
+    with httpClient:
+        result = ollamaClient.generateWithMetrics("Analizza l'incidente.")
 
-    assert isinstance(ollama_client, MeasuredLLMClient)
+    assert isinstance(ollamaClient, LLMClient)
     assert result.text == "Verificare il servizio payment."
-    assert result.token_usage is not None
-    assert result.token_usage.model_dump() == {
+    assert result.tokenUsage is not None
+    assert result.tokenUsage.model_dump() == {
         "input_tokens": 42,
         "output_tokens": 11,
         "total_tokens": 53,
     }
 
 
-def test_timeout_is_reported_as_unavailable_service() -> None:
-    def handle_request(request: httpx.Request) -> httpx.Response:
+def testTimeoutIsReportedAsUnavailableService() -> None:
+    def handleRequest(request: httpx.Request) -> httpx.Response:
         raise httpx.ReadTimeout("Timeout simulato", request=request)
 
-    ollama_client, http_client = build_client(httpx.MockTransport(handle_request))
-    with http_client, pytest.raises(LLMServiceUnavailableError, match="timeout"):
-        ollama_client.generate("Analizza l'incidente.")
+    ollamaClient, httpClient = buildClient(httpx.MockTransport(handleRequest))
+    with httpClient, pytest.raises(LLMServiceUnavailableError, match="timeout"):
+        ollamaClient.generate("Analizza l'incidente.")
 
 
-def test_connection_error_is_reported_as_unavailable_service() -> None:
-    def handle_request(request: httpx.Request) -> httpx.Response:
+def testConnectionErrorIsReportedAsUnavailableService() -> None:
+    def handleRequest(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("Connessione simulata non disponibile", request=request)
 
-    ollama_client, http_client = build_client(httpx.MockTransport(handle_request))
+    ollamaClient, httpClient = buildClient(httpx.MockTransport(handleRequest))
     with (
-        http_client,
+        httpClient,
         pytest.raises(
             LLMServiceUnavailableError,
             match="Il servizio Ollama remoto è attualmente non raggiungibile",
         ),
     ):
-        ollama_client.generate("Analizza l'incidente.")
+        ollamaClient.generate("Analizza l'incidente.")
 
 
-def test_server_http_error_is_reported_as_unavailable_service() -> None:
-    def handle_request(request: httpx.Request) -> httpx.Response:
+def testServerHttpErrorIsReportedAsUnavailableService() -> None:
+    def handleRequest(request: httpx.Request) -> httpx.Response:
         return httpx.Response(503, json={"error": "model unavailable"})
 
-    ollama_client, http_client = build_client(httpx.MockTransport(handle_request))
-    with http_client, pytest.raises(LLMServiceUnavailableError, match="temporaneamente"):
-        ollama_client.generate("Analizza l'incidente.")
+    ollamaClient, httpClient = buildClient(httpx.MockTransport(handleRequest))
+    with httpClient, pytest.raises(LLMServiceUnavailableError, match="temporaneamente"):
+        ollamaClient.generate("Analizza l'incidente.")
 
 
-def test_client_http_error_preserves_the_remote_status_code() -> None:
-    def handle_request(request: httpx.Request) -> httpx.Response:
+def testClientHttpErrorPreservesTheRemoteStatusCode() -> None:
+    def handleRequest(request: httpx.Request) -> httpx.Response:
         return httpx.Response(400, json={"error": "invalid request"})
 
-    ollama_client, http_client = build_client(httpx.MockTransport(handle_request))
-    with http_client, pytest.raises(LLMResponseError, match="400"):
-        ollama_client.generate("Analizza l'incidente.")
+    ollamaClient, httpClient = buildClient(httpx.MockTransport(handleRequest))
+    with httpClient, pytest.raises(LLMResponseError, match="400"):
+        ollamaClient.generate("Analizza l'incidente.")
 
 
 @pytest.mark.parametrize(
@@ -164,17 +163,17 @@ def test_client_http_error_preserves_the_remote_status_code() -> None:
         ),
     ],
 )
-def test_malformed_ollama_response_is_rejected(response: httpx.Response) -> None:
-    def handle_request(request: httpx.Request) -> httpx.Response:
+def testMalformedOllamaResponseIsRejected(response: httpx.Response) -> None:
+    def handleRequest(request: httpx.Request) -> httpx.Response:
         return response
 
-    ollama_client, http_client = build_client(httpx.MockTransport(handle_request))
-    with http_client, pytest.raises(LLMResponseError):
-        ollama_client.generate("Analizza l'incidente.")
+    ollamaClient, httpClient = buildClient(httpx.MockTransport(handleRequest))
+    with httpClient, pytest.raises(LLMResponseError):
+        ollamaClient.generate("Analizza l'incidente.")
 
 
 @pytest.mark.parametrize(
-    ("base_url", "model", "timeout_seconds"),
+    ("baseUrl", "model", "timeoutSeconds"),
     [
         pytest.param("ollama-test:11434", OLLAMA_MODEL, 30, id="url-senza-schema"),
         pytest.param(OLLAMA_URL, "   ", 30, id="modello-vuoto"),
@@ -182,29 +181,29 @@ def test_malformed_ollama_response_is_rejected(response: httpx.Response) -> None
         pytest.param(OLLAMA_URL, OLLAMA_MODEL, -1, id="timeout-negativo"),
     ],
 )
-def test_invalid_configuration_is_rejected(
-    base_url: str,
+def testInvalidConfigurationIsRejected(
+    baseUrl: str,
     model: str,
-    timeout_seconds: float,
+    timeoutSeconds: float,
 ) -> None:
     with pytest.raises(ValueError):
         OllamaLLMClient(
-            base_url=base_url,
+            baseUrl=baseUrl,
             model=model,
-            timeout_seconds=timeout_seconds,
+            timeoutSeconds=timeoutSeconds,
         )
 
 
-def test_empty_prompt_is_rejected_before_the_http_call() -> None:
-    request_sent = False
+def testEmptyPromptIsRejectedBeforeTheHttpCall() -> None:
+    requestSent = False
 
-    def handle_request(request: httpx.Request) -> httpx.Response:
-        nonlocal request_sent
-        request_sent = True
+    def handleRequest(request: httpx.Request) -> httpx.Response:
+        nonlocal requestSent
+        requestSent = True
         return httpx.Response(200, json={"response": "Risposta non attesa"})
 
-    ollama_client, http_client = build_client(httpx.MockTransport(handle_request))
-    with http_client, pytest.raises(ValueError, match="Prompt mancante"):
-        ollama_client.generate("   ")
+    ollamaClient, httpClient = buildClient(httpx.MockTransport(handleRequest))
+    with httpClient, pytest.raises(ValueError, match="Prompt mancante"):
+        ollamaClient.generate("   ")
 
-    assert request_sent is False
+    assert requestSent is False

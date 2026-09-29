@@ -14,6 +14,7 @@ from app.config.application import (
     ServerConfiguration,
     VectorStoreConfiguration,
 )
+from app.config.yaml_reader import YamlObjectReader
 
 __all__ = [
     "ApplicationConfiguration",
@@ -28,4 +29,5 @@ __all__ = [
     "RetrievalConfiguration",
     "ServerConfiguration",
     "VectorStoreConfiguration",
+    "YamlObjectReader",
 ]

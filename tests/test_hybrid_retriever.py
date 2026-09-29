@@ -1,28 +1,32 @@
 import pytest
+
 from app.models import DocumentChunk, RetrievalResult, SourceMetadata
 from app.retrieval import HybridRetriever, ReciprocalRankFusion, Retriever
 
+
 class RecordingRetriever:
     def __init__(self, results: list[RetrievalResult]) -> None:
-        self._results = results
+        self.results = results
         self.calls: list[tuple[str, int]] = []
 
     def retrieve(self, query: str, k: int) -> list[RetrievalResult]:
         self.calls.append((query, k))
-        return self._results[:k]
+        return self.results[:k]
 
-def build_chunk(chunk_id: str) -> DocumentChunk:
+
+def buildChunk(chunkId: str) -> DocumentChunk:
     return DocumentChunk(
-        id=chunk_id,
-        document_id=f"document-{chunk_id}",
-        text=f"Contenuto diagnostico del chunk {chunk_id}.",
+        id=chunkId,
+        documentId=f"document-{chunkId}",
+        text=f"Contenuto diagnostico del chunk {chunkId}.",
         metadata=SourceMetadata(
-            source=f"knowledge_base/{chunk_id}.md",
-            document_type="runbook",
+            source=f"knowledge_base/{chunkId}.md",
+            documentType="runbook",
         ),
     )
 
-def build_result(
+
+def buildResult(
     chunk: DocumentChunk,
     rank: int,
     score: float,
@@ -35,102 +39,108 @@ def build_result(
         retriever=retriever,
     )
 
-def build_hybrid_retriever() -> tuple[
+
+def buildHybridRetriever() -> tuple[
     HybridRetriever,
     RecordingRetriever,
     RecordingRetriever,
 ]:
-    payment = build_chunk("payment")
-    checkout = build_chunk("checkout")
-    cart = build_chunk("cart")
+    payment = buildChunk("payment")
+    checkout = buildChunk("checkout")
+    cart = buildChunk("cart")
 
-    sparse_retriever = RecordingRetriever(
+    sparseRetriever = RecordingRetriever(
         [
-            build_result(payment, rank=1, score=8.5, retriever="sparse"),
-            build_result(checkout, rank=2, score=4.2, retriever="sparse"),
+            buildResult(payment, rank=1, score=8.5, retriever="sparse"),
+            buildResult(checkout, rank=2, score=4.2, retriever="sparse"),
         ]
     )
-    dense_retriever = RecordingRetriever(
+    denseRetriever = RecordingRetriever(
         [
-            build_result(checkout, rank=1, score=0.92, retriever="dense"),
-            build_result(cart, rank=2, score=0.81, retriever="dense"),
-            build_result(payment, rank=3, score=0.73, retriever="dense"),
+            buildResult(checkout, rank=1, score=0.92, retriever="dense"),
+            buildResult(cart, rank=2, score=0.81, retriever="dense"),
+            buildResult(payment, rank=3, score=0.73, retriever="dense"),
         ]
     )
-    hybrid_retriever = HybridRetriever(
-        sparse_retriever=sparse_retriever,
-        dense_retriever=dense_retriever,
-        rank_fusion=ReciprocalRankFusion(),
-        sparse_top_k=2,
-        dense_top_k=3,
+    hybridRetriever = HybridRetriever(
+        sparseRetriever=sparseRetriever,
+        denseRetriever=denseRetriever,
+        rankFusion=ReciprocalRankFusion(),
+        sparseTopK=2,
+        denseTopK=3,
     )
-    return hybrid_retriever, sparse_retriever, dense_retriever
+    return hybridRetriever, sparseRetriever, denseRetriever
 
-def test_hybrid_retriever_satisfies_common_retriever_contract() -> None:
-    hybrid_retriever, _, _ = build_hybrid_retriever()
 
-    assert isinstance(hybrid_retriever, Retriever)
+def testHybridRetrieverSatisfiesCommonRetrieverContract() -> None:
+    hybridRetriever, _, _ = buildHybridRetriever()
 
-def test_hybrid_retriever_combines_sparse_and_dense_rankings() -> None:
-    hybrid_retriever, sparse_retriever, dense_retriever = build_hybrid_retriever()
+    assert isinstance(hybridRetriever, Retriever)
 
-    results = hybrid_retriever.retrieve("  errore durante il checkout  ", k=3)
 
-    assert sparse_retriever.calls == [("errore durante il checkout", 2)]
-    assert dense_retriever.calls == [("errore durante il checkout", 3)]
+def testHybridRetrieverCombinesSparseAndDenseRankings() -> None:
+    hybridRetriever, sparseRetriever, denseRetriever = buildHybridRetriever()
+
+    results = hybridRetriever.retrieve("  errore durante il checkout  ", k=3)
+
+    assert sparseRetriever.calls == [("errore durante il checkout", 2)]
+    assert denseRetriever.calls == [("errore durante il checkout", 3)]
     assert [result.chunk.id for result in results] == ["checkout", "payment", "cart"]
     assert [result.rank for result in results] == [1, 2, 3]
     assert {result.retriever for result in results} == {"rrf"}
 
-    checkout_contributions = {contribution.retriever for contribution in results[0].contributions}
-    assert checkout_contributions == {"sparse", "dense"}
+    checkoutContributions = {contribution.retriever for contribution in results[0].contributions}
+    assert checkoutContributions == {"sparse", "dense"}
 
-def test_hybrid_retriever_limits_the_final_result_count() -> None:
-    hybrid_retriever, _, _ = build_hybrid_retriever()
 
-    results = hybrid_retriever.retrieve("errore durante il checkout", k=2)
+def testHybridRetrieverLimitsTheFinalResultCount() -> None:
+    hybridRetriever, _, _ = buildHybridRetriever()
+
+    results = hybridRetriever.retrieve("errore durante il checkout", k=2)
 
     assert [result.chunk.id for result in results] == ["checkout", "payment"]
 
+
 @pytest.mark.parametrize(
-    ("sparse_top_k", "dense_top_k", "invalid_parameter"),
+    ("sparseTopK", "denseTopK", "invalidParameter"),
     [
         pytest.param(0, 3, "sparse_top_k", id="sparse-top-k-non-valido"),
         pytest.param(2, 0, "dense_top_k", id="dense-top-k-non-valido"),
     ],
 )
-def test_hybrid_retriever_rejects_invalid_candidate_counts(
-    sparse_top_k: int,
-    dense_top_k: int,
-    invalid_parameter: str,
+def testHybridRetrieverRejectsInvalidCandidateCounts(
+    sparseTopK: int,
+    denseTopK: int,
+    invalidParameter: str,
 ) -> None:
-    empty_retriever = RecordingRetriever([])
+    emptyRetriever = RecordingRetriever([])
 
-    with pytest.raises(ValueError, match=invalid_parameter):
+    with pytest.raises(ValueError, match=invalidParameter):
         HybridRetriever(
-            sparse_retriever=empty_retriever,
-            dense_retriever=empty_retriever,
-            rank_fusion=ReciprocalRankFusion(),
-            sparse_top_k=sparse_top_k,
-            dense_top_k=dense_top_k,
+            sparseRetriever=emptyRetriever,
+            denseRetriever=emptyRetriever,
+            rankFusion=ReciprocalRankFusion(),
+            sparseTopK=sparseTopK,
+            denseTopK=denseTopK,
         )
 
+
 @pytest.mark.parametrize(
-    ("query", "k", "expected_message"),
+    ("query", "k", "expectedMessage"),
     [
         pytest.param("   ", 3, "query", id="query-vuota"),
         pytest.param("checkout failure", 0, "parametro k", id="top-k-finale-non-valido"),
     ],
 )
-def test_hybrid_retriever_rejects_invalid_requests(
+def testHybridRetrieverRejectsInvalidRequests(
     query: str,
     k: int,
-    expected_message: str,
+    expectedMessage: str,
 ) -> None:
-    hybrid_retriever, sparse_retriever, dense_retriever = build_hybrid_retriever()
+    hybridRetriever, sparseRetriever, denseRetriever = buildHybridRetriever()
 
-    with pytest.raises(ValueError, match=expected_message):
-        hybrid_retriever.retrieve(query, k)
+    with pytest.raises(ValueError, match=expectedMessage):
+        hybridRetriever.retrieve(query, k)
 
-    assert sparse_retriever.calls == []
-    assert dense_retriever.calls == []
+    assert sparseRetriever.calls == []
+    assert denseRetriever.calls == []

@@ -12,56 +12,56 @@ from app.models import (
 )
 
 
-def payment_runbook_metadata() -> SourceMetadata:
+def paymentRunbookMetadata() -> SourceMetadata:
     return SourceMetadata(
         source="runbooks/payment-unreachable.md",
-        document_type="runbook",
+        documentType="runbook",
         service="payment",
         section="Possibili cause",
     )
 
 
-def payment_diagnostic_chunk() -> DocumentChunk:
+def paymentDiagnosticChunk() -> DocumentChunk:
     return DocumentChunk(
         id="payment-runbook-0001",
-        document_id="payment-runbook",
+        documentId="payment-runbook",
         text="Verificare che il servizio payment sia raggiungibile dal checkout.",
-        metadata=payment_runbook_metadata(),
+        metadata=paymentRunbookMetadata(),
     )
 
 
-def test_empty_runbook_can_be_loaded_before_content_validation() -> None:
+def testEmptyRunbookCanBeLoadedBeforeContentValidation() -> None:
     document = Document(
         id="payment-runbook",
         text="",
-        metadata=payment_runbook_metadata(),
+        metadata=paymentRunbookMetadata(),
     )
 
     assert document.text == ""
     assert document.metadata.source == "runbooks/payment-unreachable.md"
 
 
-def test_chunk_points_back_to_payment_runbook() -> None:
-    chunk = payment_diagnostic_chunk()
+def testChunkPointsBackToPaymentRunbook() -> None:
+    chunk = paymentDiagnosticChunk()
 
-    assert chunk.document_id == "payment-runbook"
+    assert chunk.documentId == "payment-runbook"
     assert chunk.metadata.service == "payment"
     assert chunk.metadata.section == "Possibili cause"
 
 
-def test_empty_text_cannot_be_indexed_as_a_chunk() -> None:
+def testEmptyTextCannotBeIndexedAsAChunk() -> None:
     with pytest.raises(ValidationError):
         DocumentChunk(
             id="payment-runbook-0001",
-            document_id="payment-runbook",
+            documentId="payment-runbook",
             text="",
-            metadata=payment_runbook_metadata(),
+            metadata=paymentRunbookMetadata(),
         )
 
 
-def test_dense_result_records_score_rank_and_originating_retriever() -> None:
+def testDenseResultRecordsScoreRankAndOriginatingRetriever() -> None:
     result = RetrievalResult(
-        chunk=payment_diagnostic_chunk(),
+        chunk=paymentDiagnosticChunk(),
         rank=1,
         score=0.91,
         retriever="dense",
@@ -72,35 +72,35 @@ def test_dense_result_records_score_rank_and_originating_retriever() -> None:
     assert result.retriever == "dense"
 
 
-def test_rank_zero_is_not_a_valid_search_position() -> None:
+def testRankZeroIsNotAValidSearchPosition() -> None:
     with pytest.raises(ValidationError):
         RetrievalResult(
-            chunk=payment_diagnostic_chunk(),
+            chunk=paymentDiagnosticChunk(),
             rank=0,
             retriever="dense",
         )
 
 
-def test_token_total_must_match_input_and_output_counts() -> None:
+def testTokenTotalMustMatchInputAndOutputCounts() -> None:
     with pytest.raises(ValidationError, match="totale dei token"):
         TokenUsage(
-            input_tokens=12,
-            output_tokens=3,
-            total_tokens=14,
+            inputTokens=12,
+            outputTokens=3,
+            totalTokens=14,
         )
 
 
-def test_response_total_latency_must_match_operational_metrics() -> None:
+def testResponseTotalLatencyMustMatchOperationalMetrics() -> None:
     with pytest.raises(ValidationError, match="latenza totale"):
         RAGResponse(
             answer="Risposta di prova",
             sources=[],
-            latency_ms=20.0,
-            operational_metrics=OperationalMetrics(
-                retrieval_latency_ms=2.0,
-                reranking_latency_ms=0.0,
-                prompt_build_latency_ms=1.0,
-                generation_latency_ms=15.0,
-                total_latency_ms=19.0,
+            latencyMs=20.0,
+            operationalMetrics=OperationalMetrics(
+                retrievalLatencyMs=2.0,
+                rerankingLatencyMs=0.0,
+                promptBuildLatencyMs=1.0,
+                generationLatencyMs=15.0,
+                totalLatencyMs=19.0,
             ),
         )

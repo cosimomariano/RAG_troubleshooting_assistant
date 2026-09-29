@@ -1,21 +1,23 @@
 from math import isclose
+
 from pydantic import Field, model_validator
+
 from app.models.base import StrictModel
 from app.models.observability import OperationalMetrics
 
 
 class SourceReference(StrictModel):
-    citation_id: str = Field(
+    citationId: str = Field(
         pattern=r"^FONTE_[1-9][0-9]*$",
         description="Identificativo fornito al modello e restituito al client",
     )
-    document_id: str = Field(
+    documentId: str = Field(
         min_length=1,
         description="Identificativo stabile del documento originale",
     )
     source: str = Field(min_length=1, description="Documento originale della fonte")
-    chunk_id: str = Field(min_length=1, description="Identificativo stabile del chunk")
-    document_type: str = Field(
+    chunkId: str = Field(min_length=1, description="Identificativo stabile del chunk")
+    documentType: str = Field(
         min_length=1,
         description="Tipologia del documento originale",
     )
@@ -31,11 +33,11 @@ class SourceReference(StrictModel):
         default=None,
         description="Punteggio originale del retriever",
     )
-    fused_score: float | None = Field(
+    fusedScore: float | None = Field(
         default=None,
         description="Punteggio prodotto dalla fusione delle graduatorie",
     )
-    reranker_score: float | None = Field(
+    rerankerScore: float | None = Field(
         default=None,
         description="Punteggio prodotto dal secondo stadio di reranking",
     )
@@ -46,16 +48,16 @@ class RAGResponse(StrictModel):
 
     answer: str = Field(min_length=1, description="Risposta generata dal sistema")
     sources: list[SourceReference] = Field(description="Fonti usate nella risposta")
-    latency_ms: float = Field(ge=0, description="Latenza totale in millisecondi")
-    operational_metrics: OperationalMetrics = Field(
+    latencyMs: float = Field(ge=0, description="Latenza totale in millisecondi")
+    operationalMetrics: OperationalMetrics = Field(
         description="Dettaglio delle metriche operative della richiesta"
     )
 
     @model_validator(mode="after")
-    def validate_total_latency(self) -> "RAGResponse":
+    def validateTotalLatency(self) -> "RAGResponse":
         if not isclose(
-            self.latency_ms,
-            self.operational_metrics.total_latency_ms,
+            self.latencyMs,
+            self.operationalMetrics.totalLatencyMs,
             rel_tol=1e-9,
             abs_tol=1e-6,
         ):

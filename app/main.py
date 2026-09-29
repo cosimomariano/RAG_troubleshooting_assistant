@@ -10,20 +10,20 @@ DEFAULT_APPLICATION_CONFIGURATION = Path("configs/application.yaml")
 DEFAULT_ENVIRONMENT_FILE = Path(".env")
 
 
-def load_configuration() -> ApplicationConfiguration:
+def loadConfiguration() -> ApplicationConfiguration:
     return ApplicationConfigurationLoader().load(
-        configuration_path=DEFAULT_APPLICATION_CONFIGURATION,
-        environment_file=DEFAULT_ENVIRONMENT_FILE,
+        configurationPath=DEFAULT_APPLICATION_CONFIGURATION,
+        environmentFile=DEFAULT_ENVIRONMENT_FILE,
     )
 
 
-def create_application(configuration: ApplicationConfiguration) -> FastAPI:
-    return RAGApplicationFactory(configuration).create_api()
+def createApplication(configuration: ApplicationConfiguration) -> FastAPI:
+    return RAGApplicationFactory(configuration).createApi()
 
 
 def main() -> None:
-    configuration = load_configuration()
-    application = create_application(configuration)
+    configuration = loadConfiguration()
+    application = createApplication(configuration)
     uvicorn.run(
         application,
         host=configuration.server.host,

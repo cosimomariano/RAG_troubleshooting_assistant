@@ -1,14 +1,16 @@
 from typing import Protocol, runtime_checkable
+
 from app.models import DocumentChunk
+
 SparseSearchMatch = tuple[int, float]
 
 
 @runtime_checkable
 class SparseIndex(Protocol):
-    """Classe estendibile con le operazioni di base per lo spare retriever"""
+    """Operazioni richieste da un retriever sparso."""
 
-    @property
-    def size(self) -> int: ...
+    def getSize(self) -> int: ...
 
-    def get_chunk(self, position: int) -> DocumentChunk: ...
+    def getChunk(self, position: int) -> DocumentChunk: ...
+
     def search(self, query: str, k: int) -> list[SparseSearchMatch]: ...

@@ -1,24 +1,29 @@
 from collections.abc import Callable, Sequence
+
 import pytest
+
 from app.models import DocumentChunk, RetrievalResult, SourceMetadata
 from app.reranking import Reranker, RerankingRetriever
 from app.retrieval import Retriever
 
+
 class SequenceClock:
     def __init__(self, values: Sequence[float]) -> None:
-        self._values = iter(values)
+        self.values = iter(values)
 
     def __call__(self) -> float:
-        return next(self._values)
+        return next(self.values)
+
 
 class RecordingRetriever:
     def __init__(self, results: list[RetrievalResult]) -> None:
-        self._results = results
+        self.results = results
         self.calls: list[tuple[str, int]] = []
 
     def retrieve(self, query: str, k: int) -> list[RetrievalResult]:
         self.calls.append((query, k))
-        return self._results[:k]
+        return self.results[:k]
+
 
 class RecordingReranker:
     SCORES_BY_CHUNK_ID = {
@@ -34,12 +39,12 @@ class RecordingReranker:
         self,
         query: str,
         candidates: Sequence[RetrievalResult],
-        top_k: int,
+        topK: int,
     ) -> list[RetrievalResult]:
-        candidate_ids = tuple(candidate.chunk.id for candidate in candidates)
-        self.calls.append((query, candidate_ids, top_k))
+        candidateIds = tuple(candidate.chunk.id for candidate in candidates)
+        self.calls.append((query, candidateIds, topK))
 
-        ordered_candidates = sorted(
+        orderedCandidates = sorted(
             candidates,
             key=lambda candidate: self.SCORES_BY_CHUNK_ID[candidate.chunk.id],
             reverse=True,
@@ -48,121 +53,128 @@ class RecordingReranker:
             candidate.model_copy(
                 update={
                     "rank": rank,
-                    "reranker_score": self.SCORES_BY_CHUNK_ID[candidate.chunk.id],
+                    "rerankerScore": self.SCORES_BY_CHUNK_ID[candidate.chunk.id],
                 }
             )
-            for rank, candidate in enumerate(ordered_candidates, start=1)
+            for rank, candidate in enumerate(orderedCandidates, start=1)
         ]
 
-def build_result(chunk_id: str, rank: int) -> RetrievalResult:
+
+def buildResult(chunkId: str, rank: int) -> RetrievalResult:
     chunk = DocumentChunk(
-        id=chunk_id,
-        document_id=f"document-{chunk_id}",
-        text=f"Indicazioni diagnostiche per il servizio {chunk_id}.",
+        id=chunkId,
+        documentId=f"document-{chunkId}",
+        text=f"Indicazioni diagnostiche per il servizio {chunkId}.",
         metadata=SourceMetadata(
-            source=f"runbooks/{chunk_id}.md",
-            document_type="runbook",
-            service=chunk_id,
+            source=f"runbooks/{chunkId}.md",
+            documentType="runbook",
+            service=chunkId,
         ),
     )
     return RetrievalResult(
         chunk=chunk,
         rank=rank,
         retriever="rrf",
-        fused_score=1.0 / (60 + rank),
+        fusedScore=1.0 / (60 + rank),
     )
 
-def build_pipeline(
+
+def buildPipeline(
     clock: Callable[[], float] | None = None,
 ) -> tuple[RerankingRetriever, RecordingRetriever, RecordingReranker]:
-    candidate_retriever = RecordingRetriever(
+    candidateRetriever = RecordingRetriever(
         [
-            build_result("checkout", rank=1),
-            build_result("cart", rank=2),
-            build_result("payment", rank=3),
+            buildResult("checkout", rank=1),
+            buildResult("cart", rank=2),
+            buildResult("payment", rank=3),
         ]
     )
     reranker = RecordingReranker()
     if clock is None:
         pipeline = RerankingRetriever(
-            candidate_retriever=candidate_retriever,
+            candidateRetriever=candidateRetriever,
             reranker=reranker,
-            candidate_top_n=3,
+            candidateTopN=3,
         )
     else:
         pipeline = RerankingRetriever(
-            candidate_retriever=candidate_retriever,
+            candidateRetriever=candidateRetriever,
             reranker=reranker,
-            candidate_top_n=3,
+            candidateTopN=3,
             clock=clock,
         )
-    return pipeline, candidate_retriever, reranker
+    return pipeline, candidateRetriever, reranker
 
-def test_reranking_pipeline_satisfies_the_common_retriever_contract() -> None:
-    pipeline, _, reranker = build_pipeline()
+
+def testRerankingPipelineSatisfiesTheCommonRetrieverContract() -> None:
+    pipeline, _, reranker = buildPipeline()
 
     assert isinstance(pipeline, Retriever)
     assert isinstance(reranker, Reranker)
 
-def test_reranking_pipeline_uses_top_n_candidates_and_returns_final_top_k() -> None:
-    pipeline, candidate_retriever, reranker = build_pipeline()
+
+def testRerankingPipelineUsesTopNCandidatesAndReturnsFinalTopK() -> None:
+    pipeline, candidateRetriever, reranker = buildPipeline()
 
     results = pipeline.retrieve("  errore durante il pagamento  ", k=2)
 
-    assert candidate_retriever.calls == [("errore durante il pagamento", 3)]
+    assert candidateRetriever.calls == [("errore durante il pagamento", 3)]
     assert reranker.calls == [("errore durante il pagamento", ("checkout", "cart", "payment"), 2)]
     assert [result.chunk.id for result in results] == ["payment", "checkout"]
     assert [result.rank for result in results] == [1, 2]
-    assert [result.reranker_score for result in results] == [0.97, 0.84]
-    assert all(result.fused_score is not None for result in results)
+    assert [result.rerankerScore for result in results] == [0.97, 0.84]
+    assert all(result.fusedScore is not None for result in results)
 
-def test_reranker_is_not_called_when_retrieval_produces_no_candidates() -> None:
-    candidate_retriever = RecordingRetriever([])
+
+def testRerankerIsNotCalledWhenRetrievalProducesNoCandidates() -> None:
+    candidateRetriever = RecordingRetriever([])
     reranker = RecordingReranker()
-    pipeline = RerankingRetriever(candidate_retriever, reranker, candidate_top_n=5)
+    pipeline = RerankingRetriever(candidateRetriever, reranker, candidateTopN=5)
 
     results = pipeline.retrieve("errore durante il pagamento", k=2)
 
     assert results == []
-    assert candidate_retriever.calls == [("errore durante il pagamento", 5)]
+    assert candidateRetriever.calls == [("errore durante il pagamento", 5)]
     assert reranker.calls == []
 
 
-def test_retrieval_and_reranking_latencies_are_measured_separately() -> None:
+def testRetrievalAndRerankingLatenciesAreMeasuredSeparately() -> None:
     clock = SequenceClock([10.0, 10.012, 20.0, 20.034])
-    pipeline, _, _ = build_pipeline(clock)
+    pipeline, _, _ = buildPipeline(clock)
 
-    execution = pipeline.retrieve_with_metrics("errore durante il pagamento", k=2)
+    execution = pipeline.retrieveWithMetrics("errore durante il pagamento", k=2)
 
     assert [result.chunk.id for result in execution.results] == ["payment", "checkout"]
-    assert execution.retrieval_latency_ms == pytest.approx(12.0)
-    assert execution.reranking_latency_ms == pytest.approx(34.0)
+    assert execution.retrievalLatencyMs == pytest.approx(12.0)
+    assert execution.rerankingLatencyMs == pytest.approx(34.0)
 
-def test_candidate_top_n_must_be_positive() -> None:
+
+def testCandidateTopNMustBePositive() -> None:
     with pytest.raises(ValueError, match="candidate_top_n"):
         RerankingRetriever(
-            candidate_retriever=RecordingRetriever([]),
+            candidateRetriever=RecordingRetriever([]),
             reranker=RecordingReranker(),
-            candidate_top_n=0,
+            candidateTopN=0,
         )
 
+
 @pytest.mark.parametrize(
-    ("query", "top_k", "expected_message"),
+    ("query", "topK", "expectedMessage"),
     [
         pytest.param("   ", 2, "query", id="query-vuota"),
         pytest.param("payment failure", 0, "parametro k", id="top-k-non-positivo"),
         pytest.param("payment failure", 4, "Top-K finale", id="top-k-supera-top-n"),
     ],
 )
-def test_invalid_requests_are_rejected_before_retrieval(
+def testInvalidRequestsAreRejectedBeforeRetrieval(
     query: str,
-    top_k: int,
-    expected_message: str,
+    topK: int,
+    expectedMessage: str,
 ) -> None:
-    pipeline, candidate_retriever, reranker = build_pipeline()
+    pipeline, candidateRetriever, reranker = buildPipeline()
 
-    with pytest.raises(ValueError, match=expected_message):
-        pipeline.retrieve(query, top_k)
+    with pytest.raises(ValueError, match=expectedMessage):
+        pipeline.retrieve(query, topK)
 
-    assert candidate_retriever.calls == []
+    assert candidateRetriever.calls == []
     assert reranker.calls == []

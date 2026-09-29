@@ -19,91 +19,79 @@ class SentenceTransformerBackend(Protocol):
 class SentenceTransformerEmbeddingModel:
     def __init__(
         self,
-        model_name: str,
+        modelName: str,
         *,
-        batch_size: int = 32,
-        normalize_embeddings: bool = True,
+        batchSize: int = 32,
+        normalizeEmbeddings: bool = True,
         backend: SentenceTransformerBackend | None = None,
     ) -> None:
-        self._model_name = self._validate_model_name(model_name)
-        self._batch_size = self._validate_batch_size(batch_size)
-        self._normalize_embeddings = normalize_embeddings
-        self._backend = self._resolve_backend(backend)
-
-    @property
-    def model_name(self) -> str:
-        return self._model_name
-
-    @property
-    def batch_size(self) -> int:
-        return self._batch_size
-
-    @property
-    def normalize_embeddings(self) -> bool:
-        return self._normalize_embeddings
+        self.modelName = self.validateModelName(modelName)
+        self.batchSize = self.validateBatchSize(batchSize)
+        self.normalizeEmbeddings = normalizeEmbeddings
+        self.backend = self.resolveBackend(backend)
 
     def encode(self, texts: Sequence[str]) -> list[EmbeddingVector]:
-        text_batch = list(texts)
-        if not text_batch:
+        textBatch = list(texts)
+        if not textBatch:
             return []
 
-        encoded_vectors = self._backend.encode(
-            text_batch,
-            batch_size=self._batch_size,
+        encodedVectors = self.backend.encode(
+            textBatch,
+            batch_size=self.batchSize,
             show_progress_bar=False,
             convert_to_numpy=True,
-            normalize_embeddings=self._normalize_embeddings,
+            normalize_embeddings=self.normalizeEmbeddings,
         )
-        vectors = self._convert_vectors(encoded_vectors)
-        self._validate_result_count(text_batch, vectors)
+        vectors = self.convertVectors(encodedVectors)
+        self.validateResultCount(textBatch, vectors)
         return vectors
 
-    def _resolve_backend(
+    def resolveBackend(
         self,
         backend: SentenceTransformerBackend | None,
     ) -> SentenceTransformerBackend:
         if backend is not None:
             return backend
-        return self._load_backend(self._model_name)
+        return self.loadBackend(self.modelName)
 
     @staticmethod
-    def _convert_vectors(
-        encoded_vectors: Sequence[Sequence[float]],
+    def convertVectors(
+        encodedVectors: Sequence[Sequence[float]],
     ) -> list[EmbeddingVector]:
         vectors: list[EmbeddingVector] = []
-        for encoded_vector in encoded_vectors:
-            vector = [float(value) for value in encoded_vector]
+        for encodedVector in encodedVectors:
+            vector = [float(value) for value in encodedVector]
             vectors.append(vector)
         return vectors
 
     @staticmethod
-    def _validate_result_count(
-        text_batch: list[str],
+    def validateResultCount(
+        textBatch: list[str],
         vectors: list[EmbeddingVector],
     ) -> None:
-        if len(vectors) != len(text_batch):
+        if len(vectors) != len(textBatch):
             raise ValueError(
                 "Il numero di embedding restituiti non coincide con il numero di testi."
             )
 
     @staticmethod
-    def _validate_model_name(model_name: str) -> str:
-        normalized_model_name = model_name.strip()
-        if not normalized_model_name:
+    def validateModelName(modelName: str) -> str:
+        normalizedModelName = modelName.strip()
+        if not normalizedModelName:
             raise ValueError("Il nome del modello di embedding non può essere vuoto.")
-        return normalized_model_name
+        return normalizedModelName
 
     @staticmethod
-    def _validate_batch_size(batch_size: int) -> int:
-        if batch_size <= 0:
+    def validateBatchSize(batchSize: int) -> int:
+        if batchSize <= 0:
             raise ValueError("La dimensione del batch deve essere maggiore di zero.")
-        return batch_size
+        return batchSize
 
     @staticmethod
-    def _load_backend(model_name: str) -> SentenceTransformerBackend:
+    def loadBackend(modelName: str) -> SentenceTransformerBackend:
         try:
             from sentence_transformers import SentenceTransformer
         except ImportError as error:
             raise RuntimeError("Impossibile caricare Sentence Transformers.") from error
 
-        return SentenceTransformer(model_name)
+        return SentenceTransformer(modelName)

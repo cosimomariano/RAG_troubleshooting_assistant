@@ -1,8 +1,8 @@
 from pathlib import Path
 
-import yaml
 from pydantic import Field, ValidationError
 
+from app.config.yaml_reader import YamlObjectReader
 from app.models import StrictModel
 from app.retrieval import RetrievalMode
 
@@ -41,20 +41,16 @@ class ExperimentConfiguration(StrictModel):
 class ExperimentConfigurationLoader:
     """Carica e valida una configurazione sperimentale YAML."""
 
-    def load(self, configuration_path: str | Path) -> ExperimentConfiguration:
-        path = Path(configuration_path)
-        if not path.is_file():
-            raise FileNotFoundError(f"Configurazione sperimentale non trovata: {path}")
+    def __init__(self, yamlObjectReader: YamlObjectReader | None = None) -> None:
+        self.yamlObjectReader = yamlObjectReader or YamlObjectReader()
+
+    def load(self, configurationPath: str | Path) -> ExperimentConfiguration:
+        serializedConfiguration = self.yamlObjectReader.read(
+            configurationPath,
+            "sperimentale",
+        )
 
         try:
-            serialized_configuration = yaml.safe_load(path.read_text(encoding="utf-8"))
-        except yaml.YAMLError as error:
-            raise ValueError("La configurazione sperimentale contiene YAML non valido.") from error
-
-        if not isinstance(serialized_configuration, dict):
-            raise ValueError("La configurazione sperimentale deve essere un oggetto YAML.")
-
-        try:
-            return ExperimentConfiguration.model_validate(serialized_configuration)
+            return ExperimentConfiguration.model_validate(serializedConfiguration)
         except ValidationError as error:
             raise ValueError("La configurazione sperimentale non rispetta lo schema.") from error

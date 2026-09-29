@@ -4,95 +4,82 @@ from time import perf_counter
 from app.models import RetrievalResult
 from app.reranking.base import Reranker
 from app.retrieval.base import RetrievalExecution, Retriever
+from app.validation import RetrievalValidator
 
 Clock = Callable[[], float]
 
-RerankingExecution = RetrievalExecution
 
 class RerankingRetriever:
     """Applica un secondo stadio di ordinamento ai candidati di un retriever."""
 
     def __init__(
         self,
-        candidate_retriever: Retriever,
+        candidateRetriever: Retriever,
         reranker: Reranker,
-        candidate_top_n: int,
+        candidateTopN: int,
         clock: Clock = perf_counter,
     ) -> None:
-        self._candidate_retriever = candidate_retriever
-        self._reranker = reranker
-        self._candidate_top_n = self._validate_positive_value(
-            candidate_top_n,
+        self.candidateRetriever = candidateRetriever
+        self.reranker = reranker
+        self.candidateTopN = RetrievalValidator.validateTopK(
+            candidateTopN,
             "candidate_top_n",
         )
-        self._clock = clock
+        self.clock = clock
 
     def retrieve(self, query: str, k: int) -> list[RetrievalResult]:
-        execution = self.retrieve_with_metrics(query, k)
+        execution = self.retrieveWithMetrics(query, k)
         return list(execution.results)
 
-    def retrieve_with_metrics(self, query: str, k: int) -> RerankingExecution:
+    def retrieveWithMetrics(self, query: str, k: int) -> RetrievalExecution:
         """Esegue i due stadi e restituisce le rispettive latenze."""
 
-        normalized_query = self._normalize_query(query)
-        final_top_k = self._validate_final_top_k(k)
+        normalizedQuery = RetrievalValidator.normalizeQuery(query)
+        finalTopK = self.validateFinalTopK(k)
 
-        retrieval_start_time = self._clock()
-        candidates = self._retrieve_candidates(normalized_query)
-        retrieval_latency_ms = self._calculate_elapsed_time_ms(retrieval_start_time)
+        retrievalStartTime = self.clock()
+        candidates = self.retrieveCandidates(normalizedQuery)
+        retrievalLatencyMs = self.calculateElapsedTimeMs(retrievalStartTime)
 
         if not candidates:
-            return RerankingExecution(
+            return RetrievalExecution(
                 results=(),
-                retrieval_latency_ms=retrieval_latency_ms,
-                reranking_latency_ms=0.0,
+                retrievalLatencyMs=retrievalLatencyMs,
+                rerankingLatencyMs=0.0,
             )
 
-        reranking_start_time = self._clock()
-        reranked_results = self._rerank_candidates(
-            normalized_query,
+        rerankingStartTime = self.clock()
+        rerankedResults = self.rerankCandidates(
+            normalizedQuery,
             candidates,
-            final_top_k,
+            finalTopK,
         )
-        reranking_latency_ms = self._calculate_elapsed_time_ms(reranking_start_time)
+        rerankingLatencyMs = self.calculateElapsedTimeMs(rerankingStartTime)
 
-        return RerankingExecution(
-            results=tuple(reranked_results[:final_top_k]),
-            retrieval_latency_ms=retrieval_latency_ms,
-            reranking_latency_ms=reranking_latency_ms,
+        return RetrievalExecution(
+            results=tuple(rerankedResults[:finalTopK]),
+            retrievalLatencyMs=retrievalLatencyMs,
+            rerankingLatencyMs=rerankingLatencyMs,
         )
 
-    def _retrieve_candidates(self, query: str) -> list[RetrievalResult]:
-        return self._candidate_retriever.retrieve(query, self._candidate_top_n)
+    def retrieveCandidates(self, query: str) -> list[RetrievalResult]:
+        return self.candidateRetriever.retrieve(query, self.candidateTopN)
 
-    def _rerank_candidates(
+    def rerankCandidates(
         self,
         query: str,
         candidates: Sequence[RetrievalResult],
-        final_top_k: int,
+        finalTopK: int,
     ) -> list[RetrievalResult]:
-        return self._reranker.rerank(query, candidates, final_top_k)
+        return self.reranker.rerank(query, candidates, finalTopK)
 
-    def _validate_final_top_k(self, final_top_k: int) -> int:
-        validated_top_k = self._validate_positive_value(final_top_k, "k")
-        if validated_top_k > self._candidate_top_n:
+    def validateFinalTopK(self, finalTopK: int) -> int:
+        validatedTopK = RetrievalValidator.validateTopK(finalTopK, "k")
+        if validatedTopK > self.candidateTopN:
             raise ValueError(
                 "Il valore Top-K finale non può superare il numero di candidati Top-N."
             )
-        return validated_top_k
+        return validatedTopK
 
-    @staticmethod
-    def _validate_positive_value(value: int, parameter_name: str) -> int:
-        if value <= 0:
-            raise ValueError(f"Il parametro {parameter_name} deve essere maggiore di zero.")
-        return value
-
-    def _calculate_elapsed_time_ms(self, start_time: float) -> float:
-        return (self._clock() - start_time) * 1000
-
-    @staticmethod
-    def _normalize_query(query: str) -> str:
-        normalized_query = query.strip()
-        if not normalized_query:
-            raise ValueError("La query non può essere vuota.")
-        return normalized_query
+    def calculateElapsedTimeMs(self, startTime: float) -> float:
+        return (self.clock() - startTime) * 1000

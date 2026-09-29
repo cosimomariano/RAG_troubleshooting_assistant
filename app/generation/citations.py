@@ -4,12 +4,12 @@ class CitationFormatter:
     PREFIX = "FONTE"
 
     @staticmethod
-    def build_identifier(position: int) -> str:
+    def buildIdentifier(position: int) -> str:
         if position < 1:
             raise ValueError("La posizione della citazione deve essere maggiore di zero.")
         return f"{CitationFormatter.PREFIX}_{position}"
 
     @staticmethod
-    def format_reference(position: int) -> str:
-        identifier = CitationFormatter.build_identifier(position)
+    def formatReference(position: int) -> str:
+        identifier = CitationFormatter.buildIdentifier(position)
         return f"[{identifier}]"

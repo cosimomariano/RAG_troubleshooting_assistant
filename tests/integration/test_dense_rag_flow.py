@@ -7,7 +7,7 @@ from pathlib import Path
 import httpx
 from fastapi.testclient import TestClient
 
-from app.api import create_app
+from app.api import createApp
 from app.generation import OllamaLLMClient, PromptBuilder
 from app.indexing import EmbeddingVector, FaissVectorIndex
 from app.ingestion import LocalDocumentLoader, RegexSensitiveDataMasker, SectionAwareChunker
@@ -16,63 +16,64 @@ from app.services import RAGService
 
 KNOWLEDGE_BASE = Path(__file__).resolve().parents[1] / "fixtures" / "knowledge_base"
 
+
 # Mock
 class DeterministicEmbeddingModel:
-    model_name = "embedding-deterministico-per-test"
+    modelName = "embedding-deterministico-per-test"
 
     def encode(self, texts: Sequence[str]) -> list[EmbeddingVector]:
-        return [self._vector_for(text) for text in texts]
+        return [self.vectorFor(text) for text in texts]
 
     @staticmethod
-    def _vector_for(text: str) -> EmbeddingVector:
-        normalized_text = text.lower()
+    def vectorFor(text: str) -> EmbeddingVector:
+        normalizedText = text.lower()
 
-        if "connection refused" in normalized_text:
+        if "connection refused" in normalizedText:
             return [1.0, 0.0, 0.0]
-        if "payment" in normalized_text:
+        if "payment" in normalizedText:
             return [0.8, 0.2, 0.0]
-        if "cart" in normalized_text or "carrello" in normalized_text:
+        if "cart" in normalizedText or "carrello" in normalizedText:
             return [0.0, 1.0, 0.0]
         return [0.0, 0.0, 1.0]
 
 
-def build_persistent_index(
-    index_path: Path,
-    embedding_model: DeterministicEmbeddingModel,
+def buildPersistentIndex(
+    indexPath: Path,
+    embeddingModel: DeterministicEmbeddingModel,
 ) -> FaissVectorIndex:
     # Esegue ingestione, sanitizzazione, chunking , embedding e persistenza dell'indice.
 
     loader = LocalDocumentLoader(KNOWLEDGE_BASE)
     masker = RegexSensitiveDataMasker()
-    chunker = SectionAwareChunker(chunk_size=500)
+    chunker = SectionAwareChunker(chunkSize=500)
 
     chunks = []
     for document in loader.load():
-        sanitized_document = document.model_copy(update={"text": masker.mask(document.text)})
-        chunks.extend(chunker.chunk(sanitized_document))
+        sanitizedDocument = document.model_copy(update={"text": masker.mask(document.text)})
+        chunks.extend(chunker.chunk(sanitizedDocument))
 
-    vector_index = FaissVectorIndex(dimension=3)
-    chunk_vectors = embedding_model.encode([chunk.text for chunk in chunks])
-    vector_index.add(chunks, chunk_vectors)
-    vector_index.save(index_path)
+    vectorIndex = FaissVectorIndex(dimension=3)
+    chunkVectors = embeddingModel.encode([chunk.text for chunk in chunks])
+    vectorIndex.add(chunks, chunkVectors)
+    vectorIndex.save(indexPath)
 
-    return FaissVectorIndex.load(index_path)
+    return FaissVectorIndex.load(indexPath)
 
 
-def test_dense_rag_request_reaches_mocked_ollama_with_retrieved_evidence(
+def testDenseRagRequestReachesMockedOllamaWithRetrievedEvidence(
     tmp_path: Path,
 ) -> None:
-    embedding_model = DeterministicEmbeddingModel()
-    vector_index = build_persistent_index(tmp_path / "dense-index", embedding_model)
+    embeddingModel = DeterministicEmbeddingModel()
+    vectorIndex = buildPersistentIndex(tmp_path / "dense-index", embeddingModel)
     retriever = DenseRetriever(
-        embedding_model=embedding_model,
-        vector_index=vector_index,
+        embeddingModel=embeddingModel,
+        vectorIndex=vectorIndex,
     )
 
-    ollama_request: dict[str, object] = {}
+    ollamaRequest: dict[str, object] = {}
 
-    def handle_ollama_request(request: httpx.Request) -> httpx.Response:
-        ollama_request.update(json.loads(request.content))
+    def handleOllamaRequest(request: httpx.Request) -> httpx.Response:
+        ollamaRequest.update(json.loads(request.content))
         return httpx.Response(
             200,
             json={
@@ -86,23 +87,23 @@ def test_dense_rag_request_reaches_mocked_ollama_with_retrieved_evidence(
             },
         )
 
-    transport = httpx.MockTransport(handle_ollama_request)
-    with httpx.Client(transport=transport) as http_client:
-        llm_client = OllamaLLMClient(
-            base_url="http://ollama-smoke-test:11434",
+    transport = httpx.MockTransport(handleOllamaRequest)
+    with httpx.Client(transport=transport) as httpClient:
+        llmClient = OllamaLLMClient(
+            baseUrl="http://ollama-smoke-test:11434",
             model="modello-smoke-test",
-            timeout_seconds=10,
-            http_client=http_client,
+            timeoutSeconds=10,
+            httpClient=httpClient,
         )
-        rag_service = RAGService(
+        ragService = RAGService(
             retriever=retriever,
-            prompt_builder=PromptBuilder(),
-            llm_client=llm_client,
-            top_k=1,
+            promptBuilder=PromptBuilder(),
+            llmClient=llmClient,
+            topK=1,
         )
 
-        with TestClient(create_app(rag_service)) as api_client:
-            response = api_client.post(
+        with TestClient(createApp(ragService)) as apiClient:
+            response = apiClient.post(
                 "/troubleshoot",
                 json={
                     "question": "Perché checkout non completa il pagamento?",
@@ -114,37 +115,35 @@ def test_dense_rag_request_reaches_mocked_ollama_with_retrieved_evidence(
             )
 
     assert response.status_code == 200
-    response_body = response.json()
-    assert response_body["answer"] == (
+    responseBody = response.json()
+    assert responseBody["answer"] == (
         "Il checkout non completa il pagamento perché il servizio payment non è raggiungibile."
     )
-    assert response_body["latency_ms"] >= 0
-    assert response_body["operational_metrics"]["retrieval_latency_ms"] >= 0
-    assert response_body["operational_metrics"]["generation_latency_ms"] >= 0
-    assert response_body["operational_metrics"]["total_latency_ms"] == (
-        response_body["latency_ms"]
-    )
-    assert response_body["operational_metrics"]["token_usage"] == {
+    assert responseBody["latency_ms"] >= 0
+    assert responseBody["operational_metrics"]["retrieval_latency_ms"] >= 0
+    assert responseBody["operational_metrics"]["generation_latency_ms"] >= 0
+    assert responseBody["operational_metrics"]["total_latency_ms"] == (responseBody["latency_ms"])
+    assert responseBody["operational_metrics"]["token_usage"] == {
         "input_tokens": 84,
         "output_tokens": 19,
         "total_tokens": 103,
     }
-    assert len(response_body["sources"]) == 1
-    assert response_body["sources"][0]["source"] == "runbooks/payment-unreachable.md"
-    assert response_body["sources"][0]["section"] == "Diagnosi"
-    assert response_body["sources"][0]["chunk_id"].startswith("chunk-")
-    assert response_body["sources"][0]["citation_id"] == "FONTE_1"
-    assert response_body["sources"][0]["document_id"].startswith("document-")
-    assert response_body["sources"][0]["document_type"] == "markdown"
-    assert response_body["sources"][0]["rank"] == 1
-    assert response_body["sources"][0]["retriever"] == "dense"
+    assert len(responseBody["sources"]) == 1
+    assert responseBody["sources"][0]["source"] == "runbooks/payment-unreachable.md"
+    assert responseBody["sources"][0]["section"] == "Diagnosi"
+    assert responseBody["sources"][0]["chunk_id"].startswith("chunk-")
+    assert responseBody["sources"][0]["citation_id"] == "FONTE_1"
+    assert responseBody["sources"][0]["document_id"].startswith("document-")
+    assert responseBody["sources"][0]["document_type"] == "markdown"
+    assert responseBody["sources"][0]["rank"] == 1
+    assert responseBody["sources"][0]["retriever"] == "dense"
 
-    prompt_sent_to_ollama = ollama_request["prompt"]
-    assert isinstance(prompt_sent_to_ollama, str)
-    assert "[FONTE_1]" in prompt_sent_to_ollama
-    assert "runbooks/payment-unreachable.md" in prompt_sent_to_ollama
-    assert "connection refused" in prompt_sent_to_ollama
-    assert "[MASCHERATO:IP_PRIVATO]" in prompt_sent_to_ollama
-    assert "10.23.4.5" not in prompt_sent_to_ollama
-    assert ollama_request["model"] == "modello-smoke-test"
-    assert ollama_request["stream"] is False
+    promptSentToOllama = ollamaRequest["prompt"]
+    assert isinstance(promptSentToOllama, str)
+    assert "[FONTE_1]" in promptSentToOllama
+    assert "runbooks/payment-unreachable.md" in promptSentToOllama
+    assert "connection refused" in promptSentToOllama
+    assert "[MASCHERATO:IP_PRIVATO]" in promptSentToOllama
+    assert "10.23.4.5" not in promptSentToOllama
+    assert ollamaRequest["model"] == "modello-smoke-test"
+    assert ollamaRequest["stream"] is False

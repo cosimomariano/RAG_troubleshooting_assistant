@@ -20,212 +20,208 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 class DeterministicExperimentSystem:
     def __init__(self) -> None:
-        self.received_questions: list[str] = []
+        self.receivedQuestions: list[str] = []
 
     def troubleshoot(
         self,
         question: str,
-        incident_context: str | None = None,
+        incidentContext: str | None = None,
     ) -> RAGResponse:
-        self.received_questions.append(question)
+        self.receivedQuestions.append(question)
 
         if "pagamento" in question:
             return RAGResponse(
                 answer="Il servizio Payment è raggiungibile ma la chiamata Charge fallisce.",
                 sources=[
-                    self._source("architecture/system-overview.md", "architecture-001"),
-                    self._source("runbooks/payment-failure.md", "payment-001", rank=2),
+                    self.source("architecture/system-overview.md", "architecture-001"),
+                    self.source("runbooks/payment-failure.md", "payment-001", rank=2),
                 ],
-                latency_ms=10.0,
-                operational_metrics=OperationalMetrics(
-                    retrieval_latency_ms=2.0,
-                    reranking_latency_ms=1.0,
-                    prompt_build_latency_ms=0.5,
-                    generation_latency_ms=6.5,
-                    total_latency_ms=10.0,
-                    token_usage=TokenUsage(
-                        input_tokens=10,
-                        output_tokens=5,
-                        total_tokens=15,
+                latencyMs=10.0,
+                operationalMetrics=OperationalMetrics(
+                    retrievalLatencyMs=2.0,
+                    rerankingLatencyMs=1.0,
+                    promptBuildLatencyMs=0.5,
+                    generationLatencyMs=6.5,
+                    totalLatencyMs=10.0,
+                    tokenUsage=TokenUsage(
+                        inputTokens=10,
+                        outputTokens=5,
+                        totalTokens=15,
                     ),
                 ),
             )
 
         return RAGResponse(
             answer="Le fonti recuperate non permettono di identificare la causa.",
-            sources=[self._source("services/checkout-service.md", "checkout-001")],
-            latency_ms=20.0,
-            operational_metrics=OperationalMetrics(
-                retrieval_latency_ms=4.0,
-                reranking_latency_ms=0.0,
-                prompt_build_latency_ms=1.0,
-                generation_latency_ms=14.0,
-                total_latency_ms=20.0,
+            sources=[self.source("services/checkout-service.md", "checkout-001")],
+            latencyMs=20.0,
+            operationalMetrics=OperationalMetrics(
+                retrievalLatencyMs=4.0,
+                rerankingLatencyMs=0.0,
+                promptBuildLatencyMs=1.0,
+                generationLatencyMs=14.0,
+                totalLatencyMs=20.0,
             ),
         )
 
     @staticmethod
-    def _source(source: str, chunk_id: str, rank: int = 1) -> SourceReference:
+    def source(source: str, chunkId: str, rank: int = 1) -> SourceReference:
         return SourceReference(
-            citation_id=f"FONTE_{rank}",
-            document_id=f"document-{chunk_id}",
+            citationId=f"FONTE_{rank}",
+            documentId=f"document-{chunkId}",
             source=source,
-            chunk_id=chunk_id,
-            document_type="markdown",
+            chunkId=chunkId,
+            documentType="markdown",
             rank=rank,
             retriever="dense",
             score=0.9,
         )
 
 
-def build_cases() -> list[GoldenCase]:
+def buildCases() -> list[GoldenCase]:
     return [
         GoldenCase(
             id="case_payment",
             question="Perché il pagamento fallisce?",
-            incident_context="PaymentService.Charge status=ERROR",
-            expected_answer="Verificare il servizio Payment.",
-            relevant_documents=["runbooks/payment-failure.md"],
+            incidentContext="PaymentService.Charge status=ERROR",
+            expectedAnswer="Verificare il servizio Payment.",
+            relevantDocuments=["runbooks/payment-failure.md"],
         ),
         GoldenCase(
             id="case_cart",
             question="Perché il carrello non viene svuotato?",
-            incident_context="CartService.EmptyCart status=ERROR",
-            expected_answer="Verificare l'operazione EmptyCart.",
-            relevant_documents=["runbooks/cart-failure.md"],
+            incidentContext="CartService.EmptyCart status=ERROR",
+            expectedAnswer="Verificare l'operazione EmptyCart.",
+            relevantDocuments=["runbooks/cart-failure.md"],
         ),
     ]
 
 
-def build_metadata() -> ExperimentMetadata:
+def buildMetadata() -> ExperimentMetadata:
     return ExperimentMetadata(
-        dataset_path="data/golden_dataset/cases.jsonl",
-        knowledge_base_version="otel-demo-3.1.0-kb-v1",
-        git_commit="commit-test",
-        model_identifiers={
+        datasetPath="data/golden_dataset/cases.jsonl",
+        knowledgeBaseVersion="otel-demo-3.1.0-kb-v1",
+        gitCommit="commit-test",
+        modelIdentifiers={
             "generator": "generatore-test",
             "embedding": "embedding-test",
         },
     )
 
 
-def test_configuration_loader_validates_existing_experiment_yaml() -> None:
-    configuration_path = PROJECT_ROOT / "configs" / "experiments" / "dense.yaml"
+def testConfigurationLoaderValidatesExistingExperimentYaml() -> None:
+    configurationPath = PROJECT_ROOT / "configs" / "experiments" / "dense.yaml"
 
-    configuration = ExperimentConfigurationLoader().load(configuration_path)
+    configuration = ExperimentConfigurationLoader().load(configurationPath)
 
     assert configuration.experiment.id == "dense"
     assert configuration.retrieval.mode is RetrievalMode.DENSE
     assert configuration.reranker.enabled is False
 
 
-def test_configuration_loader_rejects_invalid_structure(tmp_path: Path) -> None:
-    configuration_path = tmp_path / "invalid.yaml"
-    configuration_path.write_text("experiment:\n  id: dense\n", encoding="utf-8")
+def testConfigurationLoaderRejectsInvalidStructure(tmp_path: Path) -> None:
+    configurationPath = tmp_path / "invalid.yaml"
+    configurationPath.write_text("experiment:\n  id: dense\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="non rispetta lo schema"):
-        ExperimentConfigurationLoader().load(configuration_path)
+        ExperimentConfigurationLoader().load(configurationPath)
 
 
-def test_runner_calculates_aggregate_metrics_for_all_cases() -> None:
+def testRunnerCalculatesAggregateMetricsForAllCases() -> None:
     system = DeterministicExperimentSystem()
     configuration = ExperimentConfigurationLoader().load(
         PROJECT_ROOT / "configs" / "experiments" / "dense.yaml"
     )
-    execution_time = datetime(2026, 9, 26, 10, 30, tzinfo=UTC)
+    executionTime = datetime(2026, 9, 26, 10, 30, tzinfo=UTC)
     runner = ExperimentRunner(
         system=system,
-        top_k=2,
-        timestamp_provider=lambda: execution_time,
+        topK=2,
+        timestampProvider=lambda: executionTime,
     )
 
-    experiment_run = runner.execute(configuration, build_cases(), build_metadata())
+    experimentRun = runner.execute(configuration, buildCases(), buildMetadata())
 
-    assert system.received_questions == [
+    assert system.receivedQuestions == [
         "Perché il pagamento fallisce?",
         "Perché il carrello non viene svuotato?",
     ]
-    assert experiment_run.run_id == "20260926T103000000000Z_dense"
-    assert experiment_run.metrics.case_count == 2
-    assert experiment_run.metrics.top_k == 2
-    assert experiment_run.metrics.mean_recall_at_k == 0.5
-    assert experiment_run.metrics.mean_reciprocal_rank == 0.25
-    assert experiment_run.metrics.mean_latency_ms == 15.0
-    assert experiment_run.metrics.mean_retrieval_latency_ms == 3.0
-    assert experiment_run.metrics.mean_reranking_latency_ms == 0.5
-    assert experiment_run.metrics.mean_prompt_build_latency_ms == 0.75
-    assert experiment_run.metrics.mean_generation_latency_ms == 10.25
-    assert experiment_run.metrics.token_usage_case_count == 1
-    assert experiment_run.metrics.total_input_tokens == 10
-    assert experiment_run.metrics.total_output_tokens == 5
-    assert experiment_run.metrics.total_tokens == 15
-    assert experiment_run.cases[0].recall_at_k == 1.0
-    assert experiment_run.cases[0].reciprocal_rank == 0.5
-    assert experiment_run.cases[1].recall_at_k == 0.0
+    assert experimentRun.runId == "20260926T103000000000Z_dense"
+    assert experimentRun.metrics.caseCount == 2
+    assert experimentRun.metrics.topK == 2
+    assert experimentRun.metrics.meanRecallAtK == 0.5
+    assert experimentRun.metrics.meanReciprocalRank == 0.25
+    assert experimentRun.metrics.meanLatencyMs == 15.0
+    assert experimentRun.metrics.meanRetrievalLatencyMs == 3.0
+    assert experimentRun.metrics.meanRerankingLatencyMs == 0.5
+    assert experimentRun.metrics.meanPromptBuildLatencyMs == 0.75
+    assert experimentRun.metrics.meanGenerationLatencyMs == 10.25
+    assert experimentRun.metrics.tokenUsageCaseCount == 1
+    assert experimentRun.metrics.totalInputTokens == 10
+    assert experimentRun.metrics.totalOutputTokens == 5
+    assert experimentRun.metrics.totalTokens == 15
+    assert experimentRun.cases[0].recallAtK == 1.0
+    assert experimentRun.cases[0].reciprocalRank == 0.5
+    assert experimentRun.cases[1].recallAtK == 0.0
 
 
-def test_result_writer_creates_reproducible_experiment_files(tmp_path: Path) -> None:
+def testResultWriterCreatesReproducibleExperimentFiles(tmp_path: Path) -> None:
     configuration = ExperimentConfigurationLoader().load(
         PROJECT_ROOT / "configs" / "experiments" / "dense.yaml"
     )
     runner = ExperimentRunner(
         system=DeterministicExperimentSystem(),
-        top_k=2,
-        timestamp_provider=lambda: datetime(2026, 9, 26, 10, 30, tzinfo=UTC),
+        topK=2,
+        timestampProvider=lambda: datetime(2026, 9, 26, 10, 30, tzinfo=UTC),
     )
-    experiment_run = runner.execute(configuration, build_cases(), build_metadata())
+    experimentRun = runner.execute(configuration, buildCases(), buildMetadata())
 
-    output_directory = ExperimentResultWriter().save(experiment_run, tmp_path)
+    outputDirectory = ExperimentResultWriter().save(experimentRun, tmp_path)
 
-    assert {path.name for path in output_directory.iterdir()} == {
+    assert {path.name for path in outputDirectory.iterdir()} == {
         "cases.jsonl",
         "config.yaml",
         "metrics.json",
         "summary.md",
     }
 
-    saved_configuration = yaml.safe_load(
-        (output_directory / "config.yaml").read_text(encoding="utf-8")
+    savedConfiguration = yaml.safe_load(
+        (outputDirectory / "config.yaml").read_text(encoding="utf-8")
     )
-    saved_metrics = json.loads(
-        (output_directory / "metrics.json").read_text(encoding="utf-8")
-    )
-    saved_cases = [
+    savedMetrics = json.loads((outputDirectory / "metrics.json").read_text(encoding="utf-8"))
+    savedCases = [
         json.loads(line)
-        for line in (output_directory / "cases.jsonl").read_text(encoding="utf-8").splitlines()
+        for line in (outputDirectory / "cases.jsonl").read_text(encoding="utf-8").splitlines()
     ]
 
-    assert saved_configuration["retrieval"] == {"mode": "dense"}
-    assert saved_metrics["metadata"]["git_commit"] == "commit-test"
-    assert saved_metrics["metrics"]["mean_reciprocal_rank"] == 0.25
-    assert [case["case_id"] for case in saved_cases] == ["case_payment", "case_cart"]
-    assert "Recall@K medio: 0.5000" in (
-        output_directory / "summary.md"
-    ).read_text(encoding="utf-8")
+    assert savedConfiguration["retrieval"] == {"mode": "dense"}
+    assert savedMetrics["metadata"]["git_commit"] == "commit-test"
+    assert savedMetrics["metrics"]["mean_reciprocal_rank"] == 0.25
+    assert [case["case_id"] for case in savedCases] == ["case_payment", "case_cart"]
+    assert "Recall@K medio: 0.5000" in (outputDirectory / "summary.md").read_text(encoding="utf-8")
 
 
-def test_runner_rejects_an_empty_dataset() -> None:
+def testRunnerRejectsAnEmptyDataset() -> None:
     configuration = ExperimentConfigurationLoader().load(
         PROJECT_ROOT / "configs" / "experiments" / "dense.yaml"
     )
-    runner = ExperimentRunner(DeterministicExperimentSystem(), top_k=2)
+    runner = ExperimentRunner(DeterministicExperimentSystem(), topK=2)
 
     with pytest.raises(ValueError, match="almeno un golden case"):
-        runner.execute(configuration, [], build_metadata())
+        runner.execute(configuration, [], buildMetadata())
 
 
-def test_result_writer_does_not_overwrite_an_existing_run(tmp_path: Path) -> None:
+def testResultWriterDoesNotOverwriteAnExistingRun(tmp_path: Path) -> None:
     configuration = ExperimentConfigurationLoader().load(
         PROJECT_ROOT / "configs" / "experiments" / "dense.yaml"
     )
     runner = ExperimentRunner(
         system=DeterministicExperimentSystem(),
-        top_k=2,
-        timestamp_provider=lambda: datetime(2026, 9, 26, 10, 30, tzinfo=UTC),
+        topK=2,
+        timestampProvider=lambda: datetime(2026, 9, 26, 10, 30, tzinfo=UTC),
     )
-    experiment_run = runner.execute(configuration, build_cases(), build_metadata())
+    experimentRun = runner.execute(configuration, buildCases(), buildMetadata())
     writer = ExperimentResultWriter()
-    writer.save(experiment_run, tmp_path)
+    writer.save(experimentRun, tmp_path)
 
     with pytest.raises(FileExistsError):
-        writer.save(experiment_run, tmp_path)
+        writer.save(experimentRun, tmp_path)

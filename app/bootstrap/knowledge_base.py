@@ -14,11 +14,11 @@ Clock = Callable[[], float]
 
 @dataclass(frozen=True, slots=True)
 class IndexingReport:
-    document_count: int
-    chunk_count: int
-    vector_dimension: int
-    elapsed_time_ms: float
-    output_path: Path
+    documentCount: int
+    chunkCount: int
+    vectorDimension: int
+    elapsedTimeMs: float
+    outputPath: Path
 
 
 class KnowledgeBaseProcessor:
@@ -29,35 +29,35 @@ class KnowledgeBaseProcessor:
         configuration: ApplicationConfiguration,
         masker: SensitiveDataMasker | None = None,
     ) -> None:
-        self._configuration = configuration
-        self._masker = masker or RegexSensitiveDataMasker()
+        self.configuration = configuration
+        self.masker = masker or RegexSensitiveDataMasker()
 
-    def load_documents(self) -> list[Document]:
+    def loadDocuments(self) -> list[Document]:
         loader = LocalDocumentLoader(
-            self._configuration.ingestion.knowledge_base_path,
-            recursive=self._configuration.ingestion.recursive,
+            self.configuration.ingestion.knowledgeBasePath,
+            recursive=self.configuration.ingestion.recursive,
         )
         return loader.load()
 
-    def prepare_chunks(self, documents: list[Document] | None = None) -> list[DocumentChunk]:
-        source_documents = documents if documents is not None else self.load_documents()
+    def prepareChunks(self, documents: list[Document] | None = None) -> list[DocumentChunk]:
+        sourceDocuments = documents if documents is not None else self.loadDocuments()
         chunker = SectionAwareChunker(
-            chunk_size=self._configuration.chunking.chunk_size_characters,
-            chunk_overlap=self._configuration.chunking.chunk_overlap_characters,
+            chunkSize=self.configuration.chunking.chunkSizeCharacters,
+            chunkOverlap=self.configuration.chunking.chunkOverlapCharacters,
         )
 
         chunks: list[DocumentChunk] = []
-        for document in source_documents:
-            prepared_document = self._prepare_document(document)
-            chunks.extend(chunker.chunk(prepared_document))
+        for document in sourceDocuments:
+            preparedDocument = self.prepareDocument(document)
+            chunks.extend(chunker.chunk(preparedDocument))
         return chunks
 
-    def _prepare_document(self, document: Document) -> Document:
-        if not self._configuration.masking.enabled:
+    def prepareDocument(self, document: Document) -> Document:
+        if not self.configuration.masking.enabled:
             return document
 
-        masked_text = self._masker.mask(document.text)
-        return document.model_copy(update={"text": masked_text})
+        maskedText = self.masker.mask(document.text)
+        return document.model_copy(update={"text": maskedText})
 
 
 class KnowledgeBaseIndexer:
@@ -66,47 +66,47 @@ class KnowledgeBaseIndexer:
     def __init__(
         self,
         configuration: ApplicationConfiguration,
-        embedding_model: EmbeddingModel | None = None,
+        embeddingModel: EmbeddingModel | None = None,
         processor: KnowledgeBaseProcessor | None = None,
         clock: Clock = perf_counter,
     ) -> None:
-        self._configuration = configuration
-        self._embedding_model = embedding_model or self._create_embedding_model()
-        self._processor = processor or KnowledgeBaseProcessor(configuration)
-        self._clock = clock
+        self.configuration = configuration
+        self.embeddingModel = embeddingModel or self.createEmbeddingModel()
+        self.processor = processor or KnowledgeBaseProcessor(configuration)
+        self.clock = clock
 
     def build(self) -> IndexingReport:
-        start_time = self._clock()
-        documents = self._processor.load_documents()
-        chunks = self._processor.prepare_chunks(documents)
-        self._validate_content(documents, chunks)
+        startTime = self.clock()
+        documents = self.processor.loadDocuments()
+        chunks = self.processor.prepareChunks(documents)
+        self.validateContent(documents, chunks)
 
-        vectors = self._embedding_model.encode([chunk.text for chunk in chunks])
+        vectors = self.embeddingModel.encode([chunk.text for chunk in chunks])
         if not vectors or not vectors[0]:
             raise ValueError("Il modello di embedding non ha prodotto vettori indicizzabili.")
 
-        vector_index = FaissVectorIndex(dimension=len(vectors[0]))
-        vector_index.add(chunks, vectors)
-        vector_index.save(self._configuration.vector_store.path)
+        vectorIndex = FaissVectorIndex(dimension=len(vectors[0]))
+        vectorIndex.add(chunks, vectors)
+        vectorIndex.save(self.configuration.vectorStore.path)
 
         return IndexingReport(
-            document_count=len(documents),
-            chunk_count=len(chunks),
-            vector_dimension=vector_index.dimension,
-            elapsed_time_ms=(self._clock() - start_time) * 1000,
-            output_path=self._configuration.vector_store.path,
+            documentCount=len(documents),
+            chunkCount=len(chunks),
+            vectorDimension=vectorIndex.getDimension(),
+            elapsedTimeMs=(self.clock() - startTime) * 1000,
+            outputPath=self.configuration.vectorStore.path,
         )
 
-    def _create_embedding_model(self) -> EmbeddingModel:
-        embedding_configuration = self._configuration.embeddings
+    def createEmbeddingModel(self) -> EmbeddingModel:
+        embeddingConfiguration = self.configuration.embeddings
         return SentenceTransformerEmbeddingModel(
-            model_name=embedding_configuration.model,
-            batch_size=embedding_configuration.batch_size,
-            normalize_embeddings=embedding_configuration.normalize,
+            modelName=embeddingConfiguration.model,
+            batchSize=embeddingConfiguration.batchSize,
+            normalizeEmbeddings=embeddingConfiguration.normalize,
         )
 
     @staticmethod
-    def _validate_content(
+    def validateContent(
         documents: list[Document],
         chunks: list[DocumentChunk],
     ) -> None:

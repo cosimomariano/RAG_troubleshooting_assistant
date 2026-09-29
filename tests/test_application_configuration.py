@@ -8,7 +8,7 @@ from app.retrieval import RetrievalMode
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-def build_environment(tmp_path: Path) -> dict[str, str]:
+def buildEnvironment(tmp_path: Path) -> dict[str, str]:
     return {
         "APP_ENV": "test",
         "SERVER_HOST": "127.0.0.1",
@@ -32,34 +32,34 @@ def build_environment(tmp_path: Path) -> dict[str, str]:
     }
 
 
-def test_loader_resolves_environment_references_and_validates_types(
+def testLoaderResolvesEnvironmentReferencesAndValidatesTypes(
     tmp_path: Path,
 ) -> None:
     configuration = ApplicationConfigurationLoader().load(
         PROJECT_ROOT / "configs" / "application.yaml",
-        environment=build_environment(tmp_path),
+        environment=buildEnvironment(tmp_path),
     )
 
     assert configuration.application.environment == "test"
     assert configuration.server.port == 8080
-    assert configuration.llm.timeout_seconds == 30
+    assert configuration.llm.timeoutSeconds == 30
     assert configuration.retrieval.mode is RetrievalMode.HYBRID
-    assert configuration.retrieval.top_k == 4
-    assert configuration.ingestion.knowledge_base_version == "kb-test-v1"
-    assert configuration.evaluation.results_path == tmp_path / "results"
+    assert configuration.retrieval.topK == 4
+    assert configuration.ingestion.knowledgeBaseVersion == "kb-test-v1"
+    assert configuration.evaluation.resultsPath == tmp_path / "results"
 
 
-def test_process_environment_overrides_env_file(tmp_path: Path) -> None:
-    environment = build_environment(tmp_path)
-    environment_file = tmp_path / ".env"
-    environment_file.write_text(
+def testProcessEnvironmentOverridesEnvFile(tmp_path: Path) -> None:
+    environment = buildEnvironment(tmp_path)
+    environmentFile = tmp_path / ".env"
+    environmentFile.write_text(
         "\n".join(f"{name}={value}" for name, value in environment.items()),
         encoding="utf-8",
     )
 
     configuration = ApplicationConfigurationLoader().load(
         PROJECT_ROOT / "configs" / "application.yaml",
-        environment_file=environment_file,
+        environmentFile=environmentFile,
         environment={"RETRIEVAL_MODE": "sparse"},
     )
 
@@ -67,8 +67,8 @@ def test_process_environment_overrides_env_file(tmp_path: Path) -> None:
     assert configuration.application.environment == "test"
 
 
-def test_loader_reports_a_missing_required_variable(tmp_path: Path) -> None:
-    environment = build_environment(tmp_path)
+def testLoaderReportsAMissingRequiredVariable(tmp_path: Path) -> None:
+    environment = buildEnvironment(tmp_path)
     environment.pop("OLLAMA_MODEL")
 
     with pytest.raises(ValueError, match="OLLAMA_MODEL"):

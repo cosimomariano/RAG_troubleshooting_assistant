@@ -4,10 +4,10 @@ from app.ingestion import SectionAwareChunker
 from app.models import Document, SourceMetadata
 
 
-def make_payment_runbook(
+def makePaymentRunbook(
     text: str,
     *,
-    document_type: str = "markdown",
+    documentType: str = "markdown",
     section: str | None = None,
 ) -> Document:
     return Document(
@@ -15,58 +15,58 @@ def make_payment_runbook(
         text=text,
         metadata=SourceMetadata(
             source="runbooks/payment-unreachable.md",
-            document_type=document_type,
+            documentType=documentType,
             service="payment",
             section=section,
         ),
     )
 
 
-def test_same_runbook_produces_same_chunks_and_identifiers() -> None:
-    runbook = make_payment_runbook(
+def testSameRunbookProducesSameChunksAndIdentifiers() -> None:
+    runbook = makePaymentRunbook(
         "# Errore di connessione\n" + "connection refused verso payment. " * 12
     )
-    chunker = SectionAwareChunker(chunk_size=90, chunk_overlap=15)
+    chunker = SectionAwareChunker(chunkSize=90, chunkOverlap=15)
 
-    first_run = chunker.chunk(runbook)
-    second_run = chunker.chunk(runbook)
+    firstRun = chunker.chunk(runbook)
+    secondRun = chunker.chunk(runbook)
 
-    assert first_run == second_run
-    assert [chunk.id for chunk in first_run] == [chunk.id for chunk in second_run]
+    assert firstRun == secondRun
+    assert [chunk.id for chunk in firstRun] == [chunk.id for chunk in secondRun]
 
 
-def test_markdown_headings_are_preserved_as_chunk_sections() -> None:
-    runbook = make_payment_runbook(
+def testMarkdownHeadingsArePreservedAsChunkSections() -> None:
+    runbook = makePaymentRunbook(
         "# Sintomi\nIl checkout riceve connection refused.\n"
         "# Verifiche\nControllare lo stato del servizio payment."
     )
 
-    chunks = SectionAwareChunker(chunk_size=200).chunk(runbook)
+    chunks = SectionAwareChunker(chunkSize=200).chunk(runbook)
 
     assert [chunk.metadata.section for chunk in chunks] == ["Sintomi", "Verifiche"]
     assert chunks[0].text.startswith("# Sintomi")
     assert chunks[1].text.startswith("# Verifiche")
 
 
-def test_chunk_keeps_document_and_service_provenance() -> None:
-    operational_note = make_payment_runbook(
+def testChunkKeepsDocumentAndServiceProvenance() -> None:
+    operationalNote = makePaymentRunbook(
         "Riavviare payment solo dopo aver verificato le dipendenze.",
-        document_type="text",
+        documentType="text",
         section="Procedura operativa",
     )
 
-    chunk = SectionAwareChunker(chunk_size=100).chunk(operational_note)[0]
+    chunk = SectionAwareChunker(chunkSize=100).chunk(operationalNote)[0]
 
-    assert chunk.document_id == operational_note.id
+    assert chunk.documentId == operationalNote.id
     assert chunk.metadata.source == "runbooks/payment-unreachable.md"
     assert chunk.metadata.service == "payment"
     assert chunk.metadata.section == "Procedura operativa"
 
 
-def test_overlap_keeps_boundary_text_in_adjacent_chunks() -> None:
-    note = make_payment_runbook("checkoutpaymentdown", document_type="text")
+def testOverlapKeepsBoundaryTextInAdjacentChunks() -> None:
+    note = makePaymentRunbook("checkoutpaymentdown", documentType="text")
 
-    chunks = SectionAwareChunker(chunk_size=10, chunk_overlap=2).chunk(note)
+    chunks = SectionAwareChunker(chunkSize=10, chunkOverlap=2).chunk(note)
 
     assert [chunk.text for chunk in chunks] == ["checkoutpa", "paymentdow", "own"]
     assert chunks[0].text[-2:] == chunks[1].text[:2] == "pa"
@@ -81,14 +81,14 @@ def test_overlap_keeps_boundary_text_in_adjacent_chunks() -> None:
         pytest.param("\n\n", id="righe-vuote"),
     ],
 )
-def test_blank_document_does_not_create_retrievable_chunks(text: str) -> None:
-    document = make_payment_runbook(text)
+def testBlankDocumentDoesNotCreateRetrievableChunks(text: str) -> None:
+    document = makePaymentRunbook(text)
 
-    assert SectionAwareChunker(chunk_size=100).chunk(document) == []
+    assert SectionAwareChunker(chunkSize=100).chunk(document) == []
 
 
 @pytest.mark.parametrize(
-    ("chunk_size", "chunk_overlap"),
+    ("chunkSize", "chunkOverlap"),
     [
         pytest.param(0, 0, id="dimensione-zero"),
         pytest.param(-1, 0, id="dimensione-negativa"),
@@ -97,9 +97,9 @@ def test_blank_document_does_not_create_retrievable_chunks(text: str) -> None:
         pytest.param(10, 11, id="overlap-maggiore-della-dimensione"),
     ],
 )
-def test_invalid_chunk_boundaries_are_rejected(
-    chunk_size: int,
-    chunk_overlap: int,
+def testInvalidChunkBoundariesAreRejected(
+    chunkSize: int,
+    chunkOverlap: int,
 ) -> None:
     with pytest.raises(ValueError):
-        SectionAwareChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        SectionAwareChunker(chunkSize=chunkSize, chunkOverlap=chunkOverlap)
