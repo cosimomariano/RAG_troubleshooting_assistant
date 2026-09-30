@@ -1,15 +1,3 @@
-"""Ricalcola le misure dei capitoli 5 e 6 dalle osservazioni allegate.
-
-Uso:
-    python metrics.py
-    python metrics.py --no-show
-    python metrics.py --prepare-inputs PERCORSO_ARCHIVIO_OPERATIVO
-
-L'esecuzione ordinaria stampa le tabelle, salva i PNG e apre i grafici.
-Il comando --prepare-inputs serve solo a ricostruire il piccolo insieme di input
-a partire dalle evidenze originali; non è necessario per leggere il fascicolo.
-"""
-
 from __future__ import annotations
 
 import argparse
