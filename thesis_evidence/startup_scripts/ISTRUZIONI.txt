@@ -33,14 +33,7 @@ Gli script sono predisposti per sistemi operativi Windows (PowerShell), le confi
 
 5. Lo script mostra gli indirizzi IPv4 utilizzabili dagli altri dispositivi, sostituire quindi IP_PC_RAG nell'esempio seguente con uno di tali indirizzi:
 
-   curl --fail-with-body --silent --show-error \
-     -X POST "http://IP_PC_RAG:8000/troubleshoot" \
-     -H "Content-Type: application/json" \
-     -d '{"question":"Perche il checkout non completa il pagamento?","incident_context":"La chiamata payment/charge restituisce connection refused.","service":"checkout"}'
-
-   Da PowerShell, la stessa richiesta puo' essere eseguita su una sola riga:
-
-   curl.exe --fail-with-body --silent --show-error -X POST "http://IP_PC_RAG:8000/troubleshoot" -H "Content-Type: application/json" -d '{"question":"Perche il checkout non completa il pagamento?","incident_context":"La chiamata payment/charge restituisce connection refused.","service":"checkout"}'
+   @{ question = 'Perche il checkout non completa il pagamento?'; incident_context = 'La chiamata api/checkout restituisce 504 (Gateway Timeout).'; service = 'checkout' } | ConvertTo-Json -Compress | curl.exe --fail-with-body --silent --show-error -X POST 'http://IP_PC_RAG:8000/troubleshoot' -H 'Content-Type: application/json' --data-binary '@-'
 
    La documentazione interattiva (interfaccia swagger-ui) è disponibile all'indirizzo:
 
