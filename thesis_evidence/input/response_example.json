@@ -1,0 +1,14 @@
+{
+  "E0": {
+    "case_id": "dev_payment_unreachable_exact_01",
+    "answer_prefix": "**Causa probabile:**\nLa chiamata a `PaymentService/Charge` fallisce con un tempo di esecuzione di **0.0 ms** e status **ERROR** (codice 4006) quando il flag `paymentUnreachable` è attivo, suggerisce che:\n1. **Il microservizio Payment è inaccessibile o non risponde** (es. down, timeout, configurazione errata o filtro di routing attivo).\n2. **Il client CheckoutService non riesce a inviare la richies",
+    "answer_longer_than_excerpt": true,
+    "source_count": 0
+  },
+  "E4": {
+    "case_id": "dev_payment_unreachable_exact_01",
+    "answer_prefix": "**Causa probabile:**\nLa chiamata a `PaymentService.Charge` fallisce perché **il flag `paymentUnreachable` è attivo**, il che induce il servizio **Checkout** a utilizzare un indirizzo DNS o di rete **non valido** per raggiungere `PaymentService`. Di conseguenza, la richiesta non raggiunge mai il servizio Payment, risultando in un **errore di connessione o risoluzione DNS** (non in un errore di elab",
+    "answer_longer_than_excerpt": true,
+    "source_count": 5
+  }
+}
