@@ -1,6 +1,8 @@
 import pytest
+
 from app.models import RetrievalResult
 from app.retrieval import RetrievalMode, Retriever, RetrieverSelector
+
 
 class NamedRetriever:
     def __init__(self, name: str) -> None:

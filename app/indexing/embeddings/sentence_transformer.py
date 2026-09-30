@@ -23,15 +23,17 @@ class SentenceTransformerEmbeddingModel:
         *,
         batchSize: int = 32,
         normalizeEmbeddings: bool = True,
+        inputPrefix: str = "",
         backend: SentenceTransformerBackend | None = None,
     ) -> None:
         self.modelName = self.validateModelName(modelName)
         self.batchSize = self.validateBatchSize(batchSize)
         self.normalizeEmbeddings = normalizeEmbeddings
+        self.inputPrefix = inputPrefix
         self.backend = self.resolveBackend(backend)
 
     def encode(self, texts: Sequence[str]) -> list[EmbeddingVector]:
-        textBatch = list(texts)
+        textBatch = [self.inputPrefix + text for text in texts]
         if not textBatch:
             return []
 

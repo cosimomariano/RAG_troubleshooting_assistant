@@ -84,6 +84,19 @@ def testNormalizationCanBeDisabledForEmbeddingExperiments() -> None:
     assert backend.calls[0]["normalize_embeddings"] is False
 
 
+def testInputPrefixIsAppliedBeforeEncoding() -> None:
+    backend = RecordingEncoder(vectors=[[0.4, 0.6]])
+    model = SentenceTransformerEmbeddingModel(
+        "test-bi-encoder",
+        inputPrefix="passage: ",
+        backend=backend,
+    )
+
+    model.encode(["Errore HTTP 500 nel catalogo."])
+
+    assert backend.calls[0]["sentences"] == ["passage: Errore HTTP 500 nel catalogo."]
+
+
 def testEmptyChunkCollectionSkipsModelInference() -> None:
     backend = RecordingEncoder()
     model = SentenceTransformerEmbeddingModel(
