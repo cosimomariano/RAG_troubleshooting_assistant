@@ -103,6 +103,7 @@ class KnowledgeBaseIndexer:
             modelName=embeddingConfiguration.model,
             batchSize=embeddingConfiguration.batchSize,
             normalizeEmbeddings=embeddingConfiguration.normalize,
+            inputPrefix=embeddingConfiguration.passagePrefix,
         )
 
     @staticmethod

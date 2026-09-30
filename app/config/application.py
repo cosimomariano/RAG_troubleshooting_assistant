@@ -74,6 +74,8 @@ class EmbeddingConfiguration(StrictModel):
     model: str = Field(min_length=1, description="Nome del modello bi-encoder")
     batchSize: int = Field(gt=0, description="Numero di testi elaborati per batch")
     normalize: bool = Field(description="Abilita la normalizzazione degli embedding")
+    queryPrefix: str = Field(default="", description="Prefisso del bi-encoder per le query")
+    passagePrefix: str = Field(default="", description="Prefisso del bi-encoder per i passaggi")
 
 
 class VectorStoreConfiguration(StrictModel):
