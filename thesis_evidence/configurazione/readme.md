@@ -57,6 +57,13 @@ Modelfile-v3:
 
 Il model file nella sua versione finale è stato creato in data 30/09/2026
 
+## Note
+
+Per la collezione delle metriche della GPU è stato utilizzato il comando:
+```powershell
+    C.\Windows\System32\nvidia-smi.exe `--query-gpu=utilization.gpu,memory.used,power.draw ` --format=csv,noheader,nounits
+```
+
 ## Autore
 
 - Mariano Cosimo

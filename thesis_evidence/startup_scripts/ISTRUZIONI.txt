@@ -40,6 +40,6 @@ Gli script sono predisposti per sistemi operativi Windows (PowerShell), le confi
    http://IP_PC_RAG:8000/docs
 
 Le variabili impostate dagli script valgono soltanto per il processo avviato: 
-	1) il file .env non viene modificato; 
+	1) Il file .env non viene modificato; 
 	2) E2 ed E3 controllano che dense.index e chunks.json siano presenti prima dell'avvio;
-	3)  Lo script generale controlla il commit della Demo 3.1.0, avvia lo stack tramite Docker Compose, avvia Ollama e crea il modello fisso dal Modelfile incluso se non è già presente.
+	3) Lo script generale controlla il commit della Demo 3.1.0, avvia lo stack tramite Docker Compose, avvia Ollama e crea il modello fisso dal Modelfile incluso se non è già presente.
