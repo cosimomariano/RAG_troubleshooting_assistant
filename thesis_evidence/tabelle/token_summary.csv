@@ -1,0 +1,6 @@
+configuration,n_requests,token_available,mean_input_tokens,mean_output_tokens,total_input_tokens,total_output_tokens,at_output_cap
+E0,10,10,835.8,1319.5,8358,13195,0
+E1,10,10,1994.8,938.5,19948,9385,0
+E2,10,10,2011.6,864.4,20116,8644,0
+E3,10,10,2012,983.1,20120,9831,0
+E4,10,10,1953.3,912.8,19533,9128,0
