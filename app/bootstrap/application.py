@@ -135,6 +135,7 @@ class RAGApplicationFactory:
                 modelName=embeddingConfiguration.model,
                 batchSize=embeddingConfiguration.batchSize,
                 normalizeEmbeddings=embeddingConfiguration.normalize,
+                inputPrefix=embeddingConfiguration.queryPrefix,
             )
         return self.embeddingModel
 

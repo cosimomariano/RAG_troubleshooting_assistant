@@ -54,6 +54,8 @@ def testConfigurationExposesOnlyComponentsAvailableAtThisStage() -> None:
         "model": "${EMBEDDING_MODEL}",
         "batch_size": 32,
         "normalize": True,
+        "query_prefix": "query: ",
+        "passage_prefix": "passage: ",
     }
     assert configuration["vector_store"] == {
         "provider": "faiss",

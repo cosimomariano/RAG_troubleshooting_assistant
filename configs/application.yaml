@@ -43,6 +43,8 @@ embeddings:
   model: ${EMBEDDING_MODEL}
   batch_size: 32
   normalize: true
+  query_prefix: "query: "
+  passage_prefix: "passage: "
 
 vector_store:
   provider: faiss
