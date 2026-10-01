@@ -28,8 +28,13 @@ Gli script sono predisposti per sistemi operativi Windows (PowerShell), le confi
    .\02_avvia_E1_bm25.ps1        BM25 (sparse)
    .\03_avvia_E2_dense.ps1       FAISS (dense)
    .\04_avvia_E3_hybrid.ps1      recupero ibrido BM25 + FAISS + RRF
+   .\05_avvia_E4_hybrid_rerank.ps1 recupero ibrido BM25 + FAISS + RRF e Cross-Encoder
 
    Per cambiare configurazione premere Ctrl+C, attendere l'arresto e avviare lo script successivo.
+
+   E4 usa il reranker cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 su 20 candidati, con batch di 32 coppie e selezione finale di 5 fonti. Al primo avvio può essere necessario scaricare i pesi del modello. Come per gli altri script, il parametro -Port permette di cambiare la porta dell'API, ad esempio:
+
+   .\05_avvia_E4_hybrid_rerank.ps1 -Port 8001
 
 5. Lo script mostra gli indirizzi IPv4 utilizzabili dagli altri dispositivi, sostituire quindi IP_PC_RAG nell'esempio seguente con uno di tali indirizzi:
 
@@ -39,7 +44,7 @@ Gli script sono predisposti per sistemi operativi Windows (PowerShell), le confi
 
    http://IP_PC_RAG:8000/docs
 
-Le variabili impostate dagli script valgono soltanto per il processo avviato: 
+Le variabili impostate dagli script valgono per la sessione PowerShell corrente e per l'applicazione avviata:
 	1) Il file .env non viene modificato; 
-	2) E2 ed E3 controllano che dense.index e chunks.json siano presenti prima dell'avvio;
+	2) E2, E3 ed E4 controllano che dense.index e chunks.json siano presenti prima dell'avvio;
 	3) Lo script generale controlla il commit della Demo 3.1.0, avvia lo stack tramite Docker Compose, avvia Ollama e crea il modello fisso dal Modelfile incluso se non è già presente.
