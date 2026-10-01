@@ -1,0 +1,5 @@
+FROM ministral-3:8b
+PARAMETER temperature 0
+PARAMETER seed 42
+PARAMETER num_predict 3072
+PARAMETER num_ctx 4096

@@ -1,0 +1,178 @@
+{
+  "windows": [
+    {
+      "phase": "baseline",
+      "started_at_utc": "2026-09-29T13:08:36.531732+00:00",
+      "n": 12,
+      "concurrency": 4,
+      "median_ms": 9.6135,
+      "p95_ms": 24.826649999999994,
+      "observations": [
+        {
+          "latency_ms": 31.634,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 7.326,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 9.884,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 9.674,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 9.488,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 9.553,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 7.458,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 6.983,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 19.257,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 17.409,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 7.106,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 12.781,
+          "http_status": 200
+        }
+      ]
+    },
+    {
+      "phase": "fault",
+      "started_at_utc": "2026-09-29T13:08:48.584724+00:00",
+      "n": 12,
+      "concurrency": 4,
+      "median_ms": 6708.425499999999,
+      "p95_ms": 15003.2268,
+      "observations": [
+        {
+          "latency_ms": 15003.691,
+          "http_status": 504
+        },
+        {
+          "latency_ms": 15002.812,
+          "http_status": 504
+        },
+        {
+          "latency_ms": 15002.847,
+          "http_status": 504
+        },
+        {
+          "latency_ms": 15002.672,
+          "http_status": 504
+        },
+        {
+          "latency_ms": 6702.235,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 6709.046,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 6708.603,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 6708.248,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 29.428,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 55.217,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 54.226,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 23.984,
+          "http_status": 200
+        }
+      ]
+    },
+    {
+      "phase": "recovery",
+      "started_at_utc": "2026-09-29T13:09:45.377416+00:00",
+      "n": 12,
+      "concurrency": 4,
+      "median_ms": 8.788499999999999,
+      "p95_ms": 21.329349999999987,
+      "observations": [
+        {
+          "latency_ms": 14.2,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 30.043,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 12.839,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 13.035,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 9.67,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 5.912,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 8.441,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 9.136,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 6.387,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 6.355,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 5.718,
+          "http_status": 200
+        },
+        {
+          "latency_ms": 5.953,
+          "http_status": 200
+        }
+      ]
+    }
+  ]
+}

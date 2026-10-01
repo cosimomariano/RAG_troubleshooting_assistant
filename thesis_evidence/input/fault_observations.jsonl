@@ -1,0 +1,5 @@
+{"fault":"payment-unreachable","capture_id":"CAP-payment-unreachable-20260929-02","span_count":25,"http":{"cart_http_status":200,"checkout_http_status":500,"checkout_error_code":null}}
+{"fault":"payment-failure","capture_id":"CAP-payment-failure-20260929-02","span_count":31,"http":{"cart_http_status":200,"checkout_http_status":422,"checkout_error_code":"PAYMENT_FAILED"}}
+{"fault":"cart-failure","capture_id":"CAP-cart-failure-20260929-02","span_count":44,"http":{"cart_http_status":200,"checkout_http_status":504}}
+{"fault":"product-catalog-failure","capture_id":"CAP-product-catalog-failure-20260929-02","span_count":7,"http":{"target_http_status_before":200,"target_http_status_during":500,"control_http_status_during":200,"target_http_status_after":200}}
+{"fault":"product-catalog-lock-contention","capture_id":"CAP-product-catalog-lock-contention-20260929-02","span_count":8}

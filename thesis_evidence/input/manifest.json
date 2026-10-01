@@ -1,0 +1,54 @@
+{
+  "run_id": "20260929T144729Z",
+  "model": "rag-thesis-ministral-fixed:v4",
+  "model_id_abbreviated": "9887e9a7dffd",
+  "dataset_sha256": "C0CA9CB2D5A41A2836EA0DD15F776226179AB6096F68F63C63CA2715E8E93C07",
+  "index_sha256": "C2FCEAED551D938C9A73EE7B0C0672E8959B3628CF672BE250F9D64FD7BE6A10",
+  "chunks_sha256": "E397F1C8797BAE1D76F016431D2CE5AA07398E4E42ACDA92A5AD6D0FA6B0BF26",
+  "modelfile_sha256": "1EFEC9D0788E6F182A217FA3C035C875D61CB9CA79CB99E19587268163B49865",
+  "dataset_case_count": 10,
+  "top_k": 5,
+  "candidate_top_n": 20,
+  "demo_stack_active_at_start": true,
+  "completed": [
+    {
+      "configuration": "E0",
+      "case_count": 10,
+      "wall_seconds": 293.7350856000012
+    },
+    {
+      "configuration": "E1",
+      "case_count": 10,
+      "wall_seconds": 237.27096920000076
+    },
+    {
+      "configuration": "E2",
+      "case_count": 10,
+      "wall_seconds": 264.52802240000165
+    },
+    {
+      "configuration": "E3",
+      "case_count": 10,
+      "wall_seconds": 290.2254739
+    },
+    {
+      "configuration": "E4",
+      "case_count": 10,
+      "wall_seconds": 262.9789027000006
+    }
+  ],
+  "input_sha256": {
+    "rankings.jsonl": "03960127466204A3D514736F9E4B701E450B27DDED9FDFDCAEB89783E56FAF60",
+    "requests.jsonl": "4B0A4D21EE3ED92E8FFE447494CE29A143DC4FD96D6D6A2C699AF18DE9F12F76",
+    "gpu_samples.csv": "950C7ED75353997B5AA96247591BDC61833357985F62BD0EE445FF1DF1003F72",
+    "fault_observations.jsonl": "7208A84E140405E90DBC28AC1452E2D7DE6CDCAB0AEE03D88ED81BDF28D27E1C",
+    "trace_example.json": "E721D7BC9BA4F8E77162C3F1CA1835B602D775F934CFBA606D4348E26EEDF1A8",
+    "response_example.json": "17AA556B48BD3B570CA3B8F93356E36F618BA603485D386C4A990D9DC5E1FF3B",
+    "lock_contention.json": "F0FC0533C1563185A88249337C2E20F0A14C9D73789958F68D25FA3A9E1AC72E"
+  },
+  "dataset_sha256_local": {
+    "development.jsonl": "C0CA9CB2D5A41A2836EA0DD15F776226179AB6096F68F63C63CA2715E8E93C07",
+    "test.jsonl": "135E2FB1B4E816F13FE7AEE521722D60733D59D4C2B7D5294D04E08EBA2ABA10",
+    "catalog.csv": "3CF0355E76EF65E9ED8A1DF76D8BB100DD75899611BF8619099B8274041942B3"
+  }
+}
