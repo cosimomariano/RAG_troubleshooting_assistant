@@ -16,17 +16,24 @@ class DenseRetriever:
         self.vectorIndex = vectorIndex
 
     def retrieve(self, query: str, k: int) -> list[RetrievalResult]:
+        # Normalizzazione e prevalidazione
         normalizedQuery = RetrievalValidator.normalizeQuery(query)
         RetrievalValidator.validateTopK(k, "k")
 
         if self.vectorIndex.getSize() == 0:
             return []
 
+        # Encoding della query normalizzata
         queryVector = self.encodeQuery(normalizedQuery)
+
+        # Ricerca del vettore nel database vettoriale
         vectorMatches = self.vectorIndex.search(queryVector, k)
+
+        # Mapping dei risultati con i vettori recuperati
         return self.mapResults(vectorMatches)
 
     def encodeQuery(self, query: str) -> EmbeddingVector:
+        # Utilizzo del modello di embeddding fornito in configurazione per l'encoding della query
         queryVectors = self.embeddingModel.encode([query])
         if len(queryVectors) != 1:
             raise ValueError("Il modello deve restituire un solo embedding per la query.")
@@ -38,6 +45,8 @@ class DenseRetriever:
     ) -> list[RetrievalResult]:
         retrievalResults: list[RetrievalResult] = []
 
+        # Per ogni vettore recuperato incapsulo i dati in un oggetto RetrievalResult 
+        # utile per le lavorazioni successive
         for rank, vectorMatch in enumerate(vectorMatches, start=1):
             position, score = vectorMatch
             retrievalResult = RetrievalResult(

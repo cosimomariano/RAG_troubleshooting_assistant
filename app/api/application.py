@@ -40,16 +40,23 @@ class TroubleshootingController:
         self.troubleshootingService = troubleshootingService
         self.incidentContextBuilder = incidentContextBuilder or IncidentContextBuilder()
 
+    # Endpoint principale chiamato alla ricezione di una richiesta di troubleshooting
     def troubleshoot(self, request: TroubleshootingRequest) -> TroubleshootingResponse:
+        # Creazione del contesto da fornire all'LLM sulla base della request
         incidentContext = self.incidentContextBuilder.build(request)
+
+        # Inizio del flusso di logica applicativa per il troubleshooting
         ragResponse = self.troubleshootingService.troubleshoot(
             question=request.question,
             incidentContext=incidentContext,
         )
+
+        # Validazione e conversione della response ottenuta
         return TroubleshootingResponse.fromRagResponse(ragResponse)
 
 
 def createApp(ragService: TroubleshootingSystem) -> FastAPI:
+    # Definizione dei metadati del contratto
     application = FastAPI(
         title="Contratto API dell'assistente RAG per il troubleshooting",
         description=(
@@ -58,9 +65,14 @@ def createApp(ragService: TroubleshootingSystem) -> FastAPI:
         ),
         version="0.4.0",
     )
+
+    # Istanzio il controller REST
     controller = TroubleshootingController(ragService)
 
+    # Aggiunta della gestione degli errori
     registerErrorHandlers(application)
+
+    # Aggiunta del routing
     registerRoutes(application, controller)
     return application
 

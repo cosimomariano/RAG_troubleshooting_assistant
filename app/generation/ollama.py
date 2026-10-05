@@ -26,8 +26,11 @@ class OllamaLLMClient:
         return self.generateWithMetrics(prompt).text
 
     def generateWithMetrics(self, prompt: str) -> LLMGenerationResult:
+        # Normalizzazione del prompt ed incapsulamento in oggetto di request
         normalizedPrompt = self.normalizePrompt(prompt)
         requestBody = self.buildRequestBody(normalizedPrompt)
+
+        # Sottomissione della richiesta e recupero della risposta
         response = self.sendRequest(requestBody)
         return self.extractGenerationResult(response)
 

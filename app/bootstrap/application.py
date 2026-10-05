@@ -38,7 +38,9 @@ class RAGApplicationFactory:
         retrievalMode: RetrievalMode | None = None,
         rerankerEnabled: bool | None = None,
     ) -> FastAPI:
+        # Creazione del servizio RAG in base alle configurazioni fornite
         ragService = self.createRagService(retrievalMode, rerankerEnabled)
+
         return createApp(ragService)
 
     def createRagService(
@@ -46,28 +48,36 @@ class RAGApplicationFactory:
         retrievalMode: RetrievalMode | None = None,
         rerankerEnabled: bool | None = None,
     ) -> RAGService:
+
+        # Modalita di retrieval selezionata (llm_only, sparse, dense, hybrid)
         selectedMode = retrievalMode or self.configuration.retrieval.mode
         useReranker = (
             self.configuration.reranker.enabled if rerankerEnabled is None else rerankerEnabled
         )
 
         candidateCount = self.configuration.retrieval.topK
+
+        # Solo se reranker è abilitato lo valido sulla base dei top-K
         if useReranker:
             candidateCount = self.validateRerankingConfiguration(selectedMode)
 
+        # Creazione del retriever centralizzata
         baseRetriever = self.createBaseRetriever(selectedMode, candidateCount)
         retriever = baseRetriever
+
+        # Se il reranking è abilitato incapsulo il retriever nel wrapper con il candidate count
         if useReranker:
             retriever = self.createRerankingRetriever(
                 baseRetriever,
                 candidateCount,
             )
 
+        # Istanzio il servizio
         return RAGService(
-            retriever=retriever,
-            promptBuilder=PromptBuilder(),
-            llmClient=self.getLlmClient(),
-            topK=self.configuration.retrieval.topK,
+            retriever=retriever, 
+            promptBuilder=PromptBuilder(), # Istanza del costruttore di prompt
+            llmClient=self.getLlmClient(), # Istanza del client LLM
+            topK=self.configuration.retrieval.topK, # top-K definiti in pagina di configurazione
         )
 
     def createBaseRetriever(
@@ -117,6 +127,7 @@ class RAGApplicationFactory:
             candidateTopN=candidateCount,
         )
 
+    # Controlli di base per il meccanismo di reranking
     def validateRerankingConfiguration(self, mode: RetrievalMode) -> int:
         if mode is RetrievalMode.LLM_ONLY:
             raise ValueError("Il reranking non può essere applicato al baseline LLM-only.")
@@ -141,7 +152,9 @@ class RAGApplicationFactory:
 
     def getLlmClient(self) -> LLMClient:
         if self.llmClient is None:
+            # Puntamento alla sezione llm della configurazione per il prelievo degli iperparametri del foundation model
             llmConfiguration = self.configuration.llm
+            
             self.llmClient = OllamaLLMClient(
                 baseUrl=llmConfiguration.baseUrl,
                 model=llmConfiguration.model,
@@ -152,6 +165,8 @@ class RAGApplicationFactory:
     def getReranker(self) -> Reranker:
         if self.reranker is None:
             rerankerConfiguration = self.configuration.reranker
+
+            # Istanzio il CrossEncoderReranker sulla base del modello e batch size definiti in configuration
             self.reranker = CrossEncoderReranker(
                 modelName=rerankerConfiguration.model,
                 batchSize=rerankerConfiguration.batchSize,
