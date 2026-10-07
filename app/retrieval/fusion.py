@@ -48,7 +48,10 @@ class ReciprocalRankFusion:
         self,
         rankings: Sequence[Sequence[RetrievalResult]],
     ) -> list[RetrievalResult]:
+        # Validazione e collezione dei rank candidati
         candidates = self.collectCandidates(rankings)
+
+        # Ordinamento dei candidati dallo score piu alto al piu basso
         orderedCandidates = sorted(
             candidates.values(),
             key=lambda candidate: (-candidate.fusedScore, candidate.firstSeenOrder),
@@ -94,6 +97,7 @@ class ReciprocalRankFusion:
     ) -> list[RetrievalResult]:
         results: list[RetrievalResult] = []
 
+        # Incapsulamento in oggetto RetrievalResult per lavorazioni successive
         for rank, candidate in enumerate(candidates, start=1):
             results.append(
                 RetrievalResult(

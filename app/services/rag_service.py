@@ -41,11 +41,14 @@ class RAGService:
     ) -> RAGResponse:
         totalStartTime = self.clock()
 
+        # Costruzione della query con domanda e contesto forniti
         retrievalQuery = self.buildRetrievalQuery(question, incidentContext)
+        # Recupero delle fonti pertinenti sulla base della query
         retrievalExecution = self.retrieveDocuments(retrievalQuery)
         retrievedDocuments = list(retrievalExecution.results)
 
         promptStartTime = self.clock()
+        # Costruzione del prompt da sottomettere al foundation model
         prompt = self.promptBuilder.build(
             question=question,
             documents=retrievedDocuments,
@@ -54,11 +57,15 @@ class RAGService:
         promptBuildLatencyMs = self.calculateElapsedTimeMs(promptStartTime)
 
         generationStartTime = self.clock()
+        # Generazione della risposta
         generationResult = self.generateAnswer(prompt)
         generationLatencyMs = self.calculateElapsedTimeMs(generationStartTime)
 
+        # Costruzione della sezione delle fonti sulla base dei documenti recuperati
         sources = self.buildSources(retrievedDocuments)
         totalLatencyMs = self.calculateElapsedTimeMs(totalStartTime)
+
+        # Incapsulamento delle metriche raccolte nel flusso
         operationalMetrics = OperationalMetrics(
             retrievalLatencyMs=retrievalExecution.retrievalLatencyMs,
             rerankingLatencyMs=retrievalExecution.rerankingLatencyMs,
@@ -68,6 +75,7 @@ class RAGService:
             tokenUsage=generationResult.tokenUsage,
         )
 
+        # Istanziamento della risposta del sistema RAG
         return RAGResponse(
             answer=generationResult.text,
             sources=sources,
@@ -76,10 +84,14 @@ class RAGService:
         )
 
     def retrieveDocuments(self, retrievalQuery: str) -> RetrievalExecution:
+        # Solo per la configurazione E4 che usa reranking retriever calcolo le metriche 
+        # in quanto mi serve capire il tempo impiegato dal reranker aggiuntivo usato nella configurazione
         if isinstance(self.retriever, MeasuredRetriever):
             return self.retriever.retrieveWithMetrics(retrievalQuery, self.topK)
 
         retrievalStartTime = self.clock()
+        # Chiamo il recupero del retriever centralizzato che viene esteso da ogni retriever e customizzato da questi ultimi 
+        # sulla base della tipologia
         results = self.retriever.retrieve(retrievalQuery, self.topK)
         retrievalLatencyMs = self.calculateElapsedTimeMs(retrievalStartTime)
         return RetrievalExecution(
@@ -120,6 +132,7 @@ class RAGService:
         retrievalResult: RetrievalResult,
     ) -> SourceReference:
         chunk = retrievalResult.chunk
+        # Costruzione degli oggetti SourceReference con i vari metadati
         return SourceReference(
             citationId=CitationFormatter.buildIdentifier(citationPosition),
             documentId=chunk.documentId,

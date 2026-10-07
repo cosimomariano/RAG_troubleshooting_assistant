@@ -22,8 +22,13 @@ def createApplication(configuration: ApplicationConfiguration) -> FastAPI:
 
 
 def main() -> None:
+    # Caricamento della configurazione (application.yml e .env)
     configuration = loadConfiguration()
+
+    # Creazione API /troubleshoot sulla base della configurazione caricata
     application = createApplication(configuration)
+
+    # Esposizione son uvicorn dell'endpoint
     uvicorn.run(
         application,
         host=configuration.server.host,

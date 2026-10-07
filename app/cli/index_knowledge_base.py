@@ -6,6 +6,7 @@ from app.cli.common import (
     loadApplicationConfiguration,
 )
 
+# Entry point pipeline offline
 
 def buildArgumentParser() -> ArgumentParser:
     parser = ArgumentParser(
@@ -17,7 +18,9 @@ def buildArgumentParser() -> ArgumentParser:
 
 def main() -> None:
     arguments = buildArgumentParser().parse_args()
+    # Leggo la configurazione: application.yml e .env
     configuration = loadApplicationConfiguration(arguments)
+    # Avvio l'indicizzazione della knowledge base sulla base della configurazione fornita
     report = KnowledgeBaseIndexer(configuration).build()
 
     print("Indicizzazione completata.")

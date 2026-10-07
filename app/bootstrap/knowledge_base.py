@@ -77,18 +77,28 @@ class KnowledgeBaseIndexer:
 
     def build(self) -> IndexingReport:
         startTime = self.clock()
+        # Carico i documenti dalla cartella della KB
         documents = self.processor.loadDocuments()
+        # Divido in chunk la documentazione usando section-aware chunking
+        # effettuando prima il masking dei dati sensibili con l'utilizzo di regex deterministiche
         chunks = self.processor.prepareChunks(documents)
+        # Validazione del contenuto
         self.validateContent(documents, chunks)
 
+        # Codifica dei chunk utilizzando il modello di embedding fornito in configurazione
         vectors = self.embeddingModel.encode([chunk.text for chunk in chunks])
         if not vectors or not vectors[0]:
             raise ValueError("Il modello di embedding non ha prodotto vettori indicizzabili.")
 
+        # Istanzio il FaissVectorIndex che utilizza la libreria Faiss
         vectorIndex = FaissVectorIndex(dimension=len(vectors[0]))
+
+        # Aggiungo vettori e chunk, salvando poi il database vettoriale 
+        # nel path del file system definito in configurazione
         vectorIndex.add(chunks, vectors)
         vectorIndex.save(self.configuration.vectorStore.path)
 
+        # Incapsulo i metadati dello step in un oggetto utile per le lavorazioni successive
         return IndexingReport(
             documentCount=len(documents),
             chunkCount=len(chunks),
